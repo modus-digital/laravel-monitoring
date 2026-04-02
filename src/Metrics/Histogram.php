@@ -6,8 +6,13 @@ class Histogram extends Metric
 {
     public const DEFAULT_BUCKETS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
 
+    /** @var array<int> */
     protected array $buckets;
 
+    /**
+     * @param  array<string, string>  $labels
+     * @param  array<int>|null  $buckets
+     */
     public function __construct(string $name, array $labels = [], ?array $buckets = null)
     {
         parent::__construct($name, $labels);
@@ -36,6 +41,7 @@ class Histogram extends Metric
         $this->cache()->increment($this->cacheKey('sum'), (int) round($value * 100));
     }
 
+    /** @return array<int|string, int> */
     public function getBuckets(): array
     {
         $result = [];
@@ -61,6 +67,7 @@ class Histogram extends Metric
         return (int) ($this->cache()->get($this->cacheKey('bucket:+Inf')) ?? 0);
     }
 
+    /** @return array<int> */
     public function getBucketBoundaries(): array
     {
         return $this->buckets;

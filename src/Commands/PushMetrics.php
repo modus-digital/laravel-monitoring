@@ -54,6 +54,7 @@ class PushMetrics extends Command
         return self::SUCCESS;
     }
 
+    /** @param array<array{type: string, name: string, labels: array<string, string>, buckets?: array<int>}> $entries */
     private function formatPrometheus(array $entries): string
     {
         $lines = [];
@@ -102,6 +103,7 @@ class PushMetrics extends Command
         return implode("\n", $lines)."\n";
     }
 
+    /** @param array<string, string> $labels */
     private function formatLabels(array $labels): string
     {
         if (empty($labels)) {
@@ -118,6 +120,7 @@ class PushMetrics extends Command
         return '{'.implode(',', $pairs).'}';
     }
 
+    /** @param array{type: string, name: string, labels: array<string, string>, buckets?: array<int>} $entry */
     private function reconstruct(array $entry): Counter|Gauge|Histogram|null
     {
         return match ($entry['type']) {
@@ -165,6 +168,7 @@ class PushMetrics extends Command
         return $httpCode >= 200 && $httpCode < 300;
     }
 
+    /** @param array<array{type: string, name: string, labels: array<string, string>, buckets?: array<int>}> $entries */
     private function resetMetrics(array $entries): void
     {
         foreach ($entries as $entry) {

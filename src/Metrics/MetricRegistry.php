@@ -2,6 +2,7 @@
 
 namespace ModusDigital\LaravelMonitoring\Metrics;
 
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 
@@ -10,6 +11,7 @@ class MetricRegistry
     /** @var array<string, Metric> In-memory cache of metric instances for this request */
     private array $instances = [];
 
+    /** @param array<string, string> $labels */
     public function counter(string $name, array $labels = []): Counter
     {
         $counter = new Counter($name, $labels);
@@ -20,9 +22,11 @@ class MetricRegistry
             $this->register($counter);
         }
 
+        /** @var Counter */
         return $this->instances[$key];
     }
 
+    /** @param array<string, string> $labels */
     public function gauge(string $name, array $labels = []): Gauge
     {
         $gauge = new Gauge($name, $labels);
@@ -33,9 +37,14 @@ class MetricRegistry
             $this->register($gauge);
         }
 
+        /** @var Gauge */
         return $this->instances[$key];
     }
 
+    /**
+     * @param  array<string, string>  $labels
+     * @param  array<int>|null  $buckets
+     */
     public function histogram(string $name, array $labels = [], ?array $buckets = null): Histogram
     {
         $histogram = new Histogram($name, $labels, $buckets);
@@ -46,11 +55,12 @@ class MetricRegistry
             $this->register($histogram);
         }
 
+        /** @var Histogram */
         return $this->instances[$key];
     }
 
     /**
-     * @return array<array{type: string, name: string, labels: array, buckets?: array}>
+     * @return array<array{type: string, name: string, labels: array<string, string>, buckets?: array<int>}>
      */
     public function all(): array
     {
@@ -112,6 +122,7 @@ class MetricRegistry
         $this->updateIndex($regKey);
     }
 
+    /** @param array{type: string, name: string, labels: array<string, string>, buckets?: array<int>} $entry */
     private function reconstruct(array $entry): ?Metric
     {
         return match ($entry['type']) {
@@ -144,7 +155,13 @@ class MetricRegistry
         };
 
         try {
-            $this->cache()->lock($this->indexKey().':lock', 5)->get($callback);
+            $store = $this->cache()->getStore();
+
+            if ($store instanceof LockProvider) {
+                $store->lock($this->indexKey().':lock', 5)->get($callback);
+            } else {
+                $callback();
+            }
         } catch (\Throwable) {
             $callback();
         }

@@ -9,10 +9,12 @@ abstract class Metric
 {
     protected string $name;
 
+    /** @var array<string, string> */
     protected array $labels;
 
     protected string $labelsHash;
 
+    /** @param array<string, string> $labels */
     public function __construct(string $name, array $labels = [])
     {
         $this->name = $name;
@@ -27,6 +29,7 @@ abstract class Metric
         return $this->name;
     }
 
+    /** @return array<string, string> */
     public function getLabels(): array
     {
         return $this->labels;

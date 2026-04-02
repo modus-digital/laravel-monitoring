@@ -13,6 +13,7 @@ class LokiHandler extends AbstractProcessingHandler
 
     private string $auth;
 
+    /** @var array<string, string> */
     private array $labels;
 
     public function __construct()
@@ -63,7 +64,7 @@ class LokiHandler extends AbstractProcessingHandler
             'channel' => $record->channel,
         ]);
 
-        return json_encode([
+        return (string) json_encode([
             'streams' => [[
                 'stream' => $stream,
                 'values' => [[$timestampNs, json_encode($logData)]],
