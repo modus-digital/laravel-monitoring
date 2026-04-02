@@ -2,9 +2,9 @@
 
 namespace ModusDigital\LaravelMonitoring;
 
+use ModusDigital\LaravelMonitoring\Commands\LaravelMonitoringCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use ModusDigital\LaravelMonitoring\Commands\LaravelMonitoringCommand;
 
 class LaravelMonitoringServiceProvider extends PackageServiceProvider
 {
