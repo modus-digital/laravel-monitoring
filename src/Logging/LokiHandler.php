@@ -90,6 +90,5 @@ class LokiHandler extends AbstractProcessingHandler
         }
 
         curl_exec($ch);
-        curl_close($ch);
     }
 }
