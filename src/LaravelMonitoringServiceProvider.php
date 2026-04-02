@@ -16,6 +16,10 @@ class LaravelMonitoringServiceProvider extends ServiceProvider
             __DIR__ . '/../config/monitoring.php',
             'monitoring'
         );
+
+        $this->app->singleton(
+            \ModusDigital\LaravelMonitoring\Metrics\MetricRegistry::class
+        );
     }
 
     public function boot(): void
