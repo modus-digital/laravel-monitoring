@@ -28,10 +28,7 @@ class Gauge extends Metric
     {
         $key = $this->cacheKey();
 
-        if (! $this->cache()->has($key)) {
-            $this->cache()->put($key, 0, $this->ttl());
-        }
-
+        $this->cache()->add($key, 0, $this->ttl());
         $this->cache()->increment($key, (int) round($value * 100));
     }
 
@@ -39,10 +36,7 @@ class Gauge extends Metric
     {
         $key = $this->cacheKey();
 
-        if (! $this->cache()->has($key)) {
-            $this->cache()->put($key, 0, $this->ttl());
-        }
-
+        $this->cache()->add($key, 0, $this->ttl());
         $this->cache()->decrement($key, (int) round($value * 100));
     }
 

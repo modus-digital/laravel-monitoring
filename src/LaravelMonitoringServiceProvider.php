@@ -2,6 +2,7 @@
 
 namespace ModusDigital\LaravelMonitoring;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 use ModusDigital\LaravelMonitoring\Commands\PushMetrics;
@@ -39,6 +40,14 @@ class LaravelMonitoringServiceProvider extends ServiceProvider
         // ── Register artisan command ──────────────────────────
         if ($this->app->runningInConsole()) {
             $this->commands([PushMetrics::class]);
+        }
+
+        // ── Schedule metrics push ────────────────────────────
+        if (config('monitoring.pushgateway.enabled', true) && config('monitoring.pushgateway.schedule')) {
+            $this->app->afterResolving(Schedule::class, function (Schedule $schedule): void {
+                $method = config('monitoring.pushgateway.schedule', 'everyMinute');
+                $schedule->command('monitoring:push')->{$method}();
+            });
         }
 
         // ── Register Loki as a named log channel ──────────────

@@ -28,17 +28,25 @@ class Histogram extends Metric
 
     public function observe(int|float $value): void
     {
+        $ttl = $this->ttl();
+
         foreach ($this->buckets as $bound) {
             if ($value <= $bound) {
-                $this->cache()->increment($this->cacheKey("bucket:{$bound}"));
+                $key = $this->cacheKey("bucket:{$bound}");
+                $this->cache()->add($key, 0, $ttl);
+                $this->cache()->increment($key);
             }
         }
 
         // +Inf always incremented
-        $this->cache()->increment($this->cacheKey('bucket:+Inf'));
+        $infKey = $this->cacheKey('bucket:+Inf');
+        $this->cache()->add($infKey, 0, $ttl);
+        $this->cache()->increment($infKey);
 
         // Sum: store as integer (value * 100) for atomicity, divide on read
-        $this->cache()->increment($this->cacheKey('sum'), (int) round($value * 100));
+        $sumKey = $this->cacheKey('sum');
+        $this->cache()->add($sumKey, 0, $ttl);
+        $this->cache()->increment($sumKey, (int) round($value * 100));
     }
 
     /** @return array<int|string, int> */

@@ -18,9 +18,8 @@ class Counter extends Metric
     {
         $key = $this->cacheKey();
 
-        if (! $this->cache()->has($key)) {
-            $this->cache()->put($key, 0, $this->ttl());
-        }
+        // add() is atomic — only sets if key does not exist
+        $this->cache()->add($key, 0, $this->ttl());
 
         // Store as integer (value * 100) for Cache::increment() atomicity
         $this->cache()->increment($key, (int) round($value * 100));

@@ -11,6 +11,7 @@ return [
         'url' => env('PROMETHEUS_PUSHGATEWAY_URL', '127.0.0.1:9091'),
         'auth' => env('PROMETHEUS_PUSHGATEWAY_AUTH', ''),
         'job_name' => env('MONITORING_JOB_NAME', null), // null = config('app.name')
+        'schedule' => env('MONITORING_PUSH_SCHEDULE', 'everyMinute'), // Schedule method name, or null to disable
     ],
 
     /*
