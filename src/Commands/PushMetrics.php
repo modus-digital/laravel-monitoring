@@ -165,5 +165,4 @@ class PushMetrics extends Command
 
         return $httpCode >= 200 && $httpCode < 300;
     }
-
 }
