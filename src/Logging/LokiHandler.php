@@ -5,6 +5,7 @@ namespace ModusDigital\LaravelMonitoring\Logging;
 use Illuminate\Support\Facades\Auth;
 use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\Level;
+use Monolog\Logger;
 use Monolog\LogRecord;
 
 class LokiHandler extends AbstractProcessingHandler
@@ -32,6 +33,12 @@ class LokiHandler extends AbstractProcessingHandler
             ],
             config('monitoring.loki.labels', [])
         );
+    }
+
+    /** @param array<string, mixed> $config */
+    public function __invoke(array $config): Logger
+    {
+        return new Logger('loki', [$this]);
     }
 
     protected function write(LogRecord $record): void

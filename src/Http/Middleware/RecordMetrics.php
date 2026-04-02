@@ -16,10 +16,6 @@ class RecordMetrics
 
     public function terminate(Request $request, Response $response): void
     {
-        if (! config('monitoring.pushgateway.enabled', true)) {
-            return;
-        }
-
         $route = $request->route()?->getName()
             ?? $request->route()?->uri()
             ?? 'unknown';
@@ -44,6 +40,11 @@ class RecordMetrics
             'method' => $method,
             'route' => $route,
         ])->observe($durationMs);
+
+        Monitoring::gauge('http_request_duration_last_ms', [
+            'method' => $method,
+            'route' => $route,
+        ])->set($durationMs);
     }
 
     private function durationMs(): float

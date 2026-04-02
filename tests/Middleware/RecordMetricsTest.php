@@ -13,7 +13,7 @@ beforeEach(function () {
     config()->set('monitoring.middleware.exclude', ['_debugbar']);
 });
 
-it('records http request counter and duration histogram', function () {
+it('records http request counter, duration histogram and duration gauge', function () {
     $registry = app(MetricRegistry::class);
     $middleware = new RecordMetrics;
 
@@ -28,6 +28,7 @@ it('records http request counter and duration histogram', function () {
 
     expect($types)->toContain('counter');
     expect($types)->toContain('histogram');
+    expect($types)->toContain('gauge');
 });
 
 it('skips excluded routes', function () {
@@ -44,7 +45,7 @@ it('skips excluded routes', function () {
     expect($all)->toHaveCount(0);
 });
 
-it('skips when monitoring is disabled', function () {
+it('records metrics even when pushgateway is disabled', function () {
     config()->set('monitoring.pushgateway.enabled', false);
 
     $registry = app(MetricRegistry::class);
@@ -57,5 +58,5 @@ it('skips when monitoring is disabled', function () {
     $middleware->terminate($request, $response);
 
     $all = $registry->all();
-    expect($all)->toHaveCount(0);
+    expect($all)->not->toHaveCount(0);
 });

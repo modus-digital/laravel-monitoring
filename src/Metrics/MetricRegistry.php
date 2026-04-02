@@ -104,10 +104,6 @@ class MetricRegistry
     {
         $regKey = $this->registrationKey($metric);
 
-        if ($this->cache()->has($regKey)) {
-            return;
-        }
-
         $entry = [
             'type' => $metric->getType(),
             'name' => $metric->getName(),
@@ -118,8 +114,8 @@ class MetricRegistry
             $entry['buckets'] = $metric->getBucketBoundaries();
         }
 
-        $this->cache()->put($regKey, $entry);
         $this->updateIndex($regKey);
+        $this->cache()->put($regKey, $entry);
     }
 
     /** @param array{type: string, name: string, labels: array<string, string>, buckets?: array<int>} $entry */
@@ -158,7 +154,11 @@ class MetricRegistry
             $store = $this->cache()->getStore();
 
             if ($store instanceof LockProvider) {
-                $store->lock($this->indexKey().':lock', 5)->get($callback);
+                $acquired = $store->lock($this->indexKey().':lock', 5)->get($callback);
+
+                if (! $acquired) {
+                    $callback();
+                }
             } else {
                 $callback();
             }

@@ -3,10 +3,8 @@
 namespace ModusDigital\LaravelMonitoring;
 
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
 use ModusDigital\LaravelMonitoring\Commands\PushMetrics;
-use ModusDigital\LaravelMonitoring\Http\Middleware\RecordMetrics;
 use ModusDigital\LaravelMonitoring\Logging\LokiHandler;
 use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 
@@ -30,12 +28,6 @@ class LaravelMonitoringServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/monitoring.php' => config_path('monitoring.php'),
         ], 'monitoring-config');
-
-        // ── Auto-register HTTP metrics middleware ─────────────
-        if (config('monitoring.middleware.auto_register', true)) {
-            $kernel = $this->app->make(Kernel::class);
-            $kernel->pushMiddleware(RecordMetrics::class);
-        }
 
         // ── Register artisan command ──────────────────────────
         if ($this->app->runningInConsole()) {
