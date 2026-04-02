@@ -46,7 +46,6 @@ class PushMetrics extends Command
             return self::FAILURE;
         }
 
-        $this->resetMetrics($entries);
         $registry->cleanStale();
 
         $this->info('Metrics pushed successfully.');
@@ -167,19 +166,4 @@ class PushMetrics extends Command
         return $httpCode >= 200 && $httpCode < 300;
     }
 
-    /** @param array<array{type: string, name: string, labels: array<string, string>, buckets?: array<int>}> $entries */
-    private function resetMetrics(array $entries): void
-    {
-        foreach ($entries as $entry) {
-            $metric = $this->reconstruct($entry);
-
-            if ($metric === null) {
-                continue;
-            }
-
-            if ($metric instanceof Counter || $metric instanceof Histogram) {
-                $metric->reset();
-            }
-        }
-    }
 }

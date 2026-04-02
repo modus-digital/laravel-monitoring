@@ -37,15 +37,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'middleware' => [
-        'auto_register' => env('MONITORING_AUTO_MIDDLEWARE', true),
-
-        'exclude' => [
-            '_debugbar',
-            '_ignition',
-            'telescope',
-            'horizon',
-            'livewire/update',
-        ],
+        'exclude' => [],
     ],
 
     /*

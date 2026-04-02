@@ -63,7 +63,7 @@ it('skips push when disabled', function () {
     expect($output)->toContain('Pushgateway is disabled');
 });
 
-it('does not reset metrics on dry-run', function () {
+it('preserves cumulative counter values after push', function () {
     $registry = app(MetricRegistry::class);
     $counter = $registry->counter('requests_total', []);
     $gauge = $registry->gauge('queue_depth', []);
