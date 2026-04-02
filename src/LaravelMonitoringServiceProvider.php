@@ -1,12 +1,12 @@
 <?php
 
-namespace VendorName\Skeleton;
+namespace ModusDigital\LaravelMonitoring;
 
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use VendorName\Skeleton\Commands\SkeletonCommand;
+use ModusDigital\LaravelMonitoring\Commands\LaravelMonitoringCommand;
 
-class SkeletonServiceProvider extends PackageServiceProvider
+class LaravelMonitoringServiceProvider extends PackageServiceProvider
 {
     public function configurePackage(Package $package): void
     {
@@ -16,10 +16,10 @@ class SkeletonServiceProvider extends PackageServiceProvider
          * More info: https://github.com/spatie/laravel-package-tools
          */
         $package
-            ->name('skeleton')
+            ->name('laravel-monitoring')
             ->hasConfigFile()
             ->hasViews()
-            ->hasMigration('create_migration_table_name_table')
-            ->hasCommand(SkeletonCommand::class);
+            ->hasMigration('create_laravel_monitoring_table')
+            ->hasCommand(LaravelMonitoringCommand::class);
     }
 }

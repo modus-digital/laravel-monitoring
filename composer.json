@@ -1,17 +1,17 @@
 {
-    "name": ":vendor_slug/:package_slug",
-    "description": ":package_description",
+    "name": "modus-digital/laravel-monitoring",
+    "description": "Drop-in Prometheus + Loki monitoring for Laravel apps. Push metrics to Pushgateway and logs to Loki with zero extra dependencies.",
     "keywords": [
-        ":vendor_name",
+        "Modus Digital",
         "laravel",
-        ":package_slug"
+        "laravel-monitoring"
     ],
-    "homepage": "https://github.com/:vendor_slug/:package_slug",
+    "homepage": "https://github.com/modus-digital/laravel-monitoring",
     "license": "MIT",
     "authors": [
         {
-            "name": ":author_name",
-            "email": "author@domain.com",
+            "name": "Alex van Steenhoven",
+            "email": "alex@modus-digital.com",
             "role": "Developer"
         }
     ],
@@ -30,18 +30,17 @@
         "pestphp/pest-plugin-laravel": "^4.0",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan-deprecation-rules": "^2.0",
-        "phpstan/phpstan-phpunit": "^2.0",
-        "spatie/laravel-ray": "^1.35"
+        "phpstan/phpstan-phpunit": "^2.0"
     },
     "autoload": {
         "psr-4": {
-            "VendorName\\Skeleton\\": "src/",
-            "VendorName\\Skeleton\\Database\\Factories\\": "database/factories/"
+            "ModusDigital\\LaravelMonitoring\\": "src/",
+            "ModusDigital\\LaravelMonitoring\\Database\\Factories\\": "database/factories/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "VendorName\\Skeleton\\Tests\\": "tests/",
+            "ModusDigital\\LaravelMonitoring\\Tests\\": "tests/",
             "Workbench\\App\\": "workbench/app/"
         }
     },
@@ -63,10 +62,10 @@
     "extra": {
         "laravel": {
             "providers": [
-                "VendorName\\Skeleton\\SkeletonServiceProvider"
+                "ModusDigital\\LaravelMonitoring\\LaravelMonitoringServiceProvider"
             ],
             "aliases": {
-                "Skeleton": "VendorName\\Skeleton\\Facades\\Skeleton"
+                "LaravelMonitoring": "ModusDigital\\LaravelMonitoring\\Facades\\LaravelMonitoring"
             }
         }
     },
