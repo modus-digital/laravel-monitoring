@@ -1,7 +1,7 @@
 <?php
 
-use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 use Illuminate\Support\Facades\Artisan;
+use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 
 beforeEach(function () {
     config()->set('monitoring.cache.store', 'array');

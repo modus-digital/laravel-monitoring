@@ -8,7 +8,9 @@ use Illuminate\Support\Facades\Cache;
 abstract class Metric
 {
     protected string $name;
+
     protected array $labels;
+
     protected string $labelsHash;
 
     public function __construct(string $name, array $labels = [])

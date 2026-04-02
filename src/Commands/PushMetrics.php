@@ -99,7 +99,7 @@ class PushMetrics extends Command
             }
         }
 
-        return implode("\n", $lines) . "\n";
+        return implode("\n", $lines)."\n";
     }
 
     private function formatLabels(array $labels): string
@@ -115,16 +115,16 @@ class PushMetrics extends Command
             $pairs[] = "{$key}=\"{$escaped}\"";
         }
 
-        return '{' . implode(',', $pairs) . '}';
+        return '{'.implode(',', $pairs).'}';
     }
 
     private function reconstruct(array $entry): Counter|Gauge|Histogram|null
     {
         return match ($entry['type']) {
-            'counter'   => new Counter($entry['name'], $entry['labels']),
-            'gauge'     => new Gauge($entry['name'], $entry['labels']),
+            'counter' => new Counter($entry['name'], $entry['labels']),
+            'gauge' => new Gauge($entry['name'], $entry['labels']),
             'histogram' => new Histogram($entry['name'], $entry['labels'], $entry['buckets'] ?? null),
-            default     => null,
+            default => null,
         };
     }
 
@@ -140,10 +140,10 @@ class PushMetrics extends Command
 
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $payload,
-            CURLOPT_HTTPHEADER     => ['Content-Type: text/plain'],
-            CURLOPT_TIMEOUT        => 5,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => ['Content-Type: text/plain'],
+            CURLOPT_TIMEOUT => 5,
             CURLOPT_SSL_VERIFYPEER => true,
         ]);
 

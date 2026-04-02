@@ -4,21 +4,22 @@ namespace ModusDigital\LaravelMonitoring;
 
 use Illuminate\Foundation\Http\Kernel;
 use Illuminate\Support\ServiceProvider;
-use ModusDigital\LaravelMonitoring\Http\Middleware\RecordMetrics;
 use ModusDigital\LaravelMonitoring\Commands\PushMetrics;
+use ModusDigital\LaravelMonitoring\Http\Middleware\RecordMetrics;
 use ModusDigital\LaravelMonitoring\Logging\LokiHandler;
+use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 
 class LaravelMonitoringServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
         $this->mergeConfigFrom(
-            __DIR__ . '/../config/monitoring.php',
+            __DIR__.'/../config/monitoring.php',
             'monitoring'
         );
 
         $this->app->singleton(
-            \ModusDigital\LaravelMonitoring\Metrics\MetricRegistry::class
+            MetricRegistry::class
         );
     }
 
@@ -26,7 +27,7 @@ class LaravelMonitoringServiceProvider extends ServiceProvider
     {
         // ── Publish config ────────────────────────────────────
         $this->publishes([
-            __DIR__ . '/../config/monitoring.php' => config_path('monitoring.php'),
+            __DIR__.'/../config/monitoring.php' => config_path('monitoring.php'),
         ], 'monitoring-config');
 
         // ── Auto-register HTTP metrics middleware ─────────────
@@ -44,8 +45,8 @@ class LaravelMonitoringServiceProvider extends ServiceProvider
         // Apps can add 'loki' to their stack channel without any extra code.
         $this->app->make('config')->set('logging.channels.loki', [
             'driver' => 'custom',
-            'via'    => LokiHandler::class,
-            'level'  => config('monitoring.loki.level', 'debug'),
+            'via' => LokiHandler::class,
+            'level' => config('monitoring.loki.level', 'debug'),
         ]);
     }
 }

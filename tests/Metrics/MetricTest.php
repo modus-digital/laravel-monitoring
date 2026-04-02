@@ -1,6 +1,5 @@
 <?php
 
-use Illuminate\Support\Facades\Cache;
 use ModusDigital\LaravelMonitoring\Metrics\Counter;
 
 beforeEach(function () {

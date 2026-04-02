@@ -15,7 +15,7 @@ beforeEach(function () {
 
 it('records http request counter and duration histogram', function () {
     $registry = app(MetricRegistry::class);
-    $middleware = new RecordMetrics();
+    $middleware = new RecordMetrics;
 
     $request = Request::create('/api/users', 'GET');
     $response = new Response('OK', 200);
@@ -32,7 +32,7 @@ it('records http request counter and duration histogram', function () {
 
 it('skips excluded routes', function () {
     $registry = app(MetricRegistry::class);
-    $middleware = new RecordMetrics();
+    $middleware = new RecordMetrics;
 
     $request = Request::create('/_debugbar/assets', 'GET');
     $response = new Response('OK', 200);
@@ -48,7 +48,7 @@ it('skips when monitoring is disabled', function () {
     config()->set('monitoring.pushgateway.enabled', false);
 
     $registry = app(MetricRegistry::class);
-    $middleware = new RecordMetrics();
+    $middleware = new RecordMetrics;
 
     $request = Request::create('/api/users', 'GET');
     $response = new Response('OK', 200);

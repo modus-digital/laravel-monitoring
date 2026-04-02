@@ -28,21 +28,21 @@ class RecordMetrics
             return;
         }
 
-        $method      = $request->method();
-        $statusCode  = $response->getStatusCode();
-        $statusGroup = intdiv($statusCode, 100) . 'xx';
-        $durationMs  = $this->durationMs();
+        $method = $request->method();
+        $statusCode = $response->getStatusCode();
+        $statusGroup = intdiv($statusCode, 100).'xx';
+        $durationMs = $this->durationMs();
 
         Monitoring::counter('http_requests_total', [
-            'method'       => $method,
-            'route'        => $route,
-            'status'       => (string) $statusCode,
+            'method' => $method,
+            'route' => $route,
+            'status' => (string) $statusCode,
             'status_group' => $statusGroup,
         ])->increment();
 
         Monitoring::histogram('http_request_duration_ms', [
             'method' => $method,
-            'route'  => $route,
+            'route' => $route,
         ])->observe($durationMs);
     }
 

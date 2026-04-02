@@ -99,8 +99,8 @@ class MetricRegistry
         }
 
         $entry = [
-            'type'   => $metric->getType(),
-            'name'   => $metric->getName(),
+            'type' => $metric->getType(),
+            'name' => $metric->getName(),
             'labels' => $metric->getLabels(),
         ];
 
@@ -115,18 +115,18 @@ class MetricRegistry
     private function reconstruct(array $entry): ?Metric
     {
         return match ($entry['type']) {
-            'counter'   => new Counter($entry['name'], $entry['labels']),
-            'gauge'     => new Gauge($entry['name'], $entry['labels']),
+            'counter' => new Counter($entry['name'], $entry['labels']),
+            'gauge' => new Gauge($entry['name'], $entry['labels']),
             'histogram' => new Histogram($entry['name'], $entry['labels'], $entry['buckets'] ?? null),
-            default     => null,
+            default => null,
         };
     }
 
     private function hasData(Metric $metric): bool
     {
         return match (true) {
-            $metric instanceof Counter   => $metric->getValue() > 0,
-            $metric instanceof Gauge     => true, // Gauges represent current state — never stale
+            $metric instanceof Counter => $metric->getValue() > 0,
+            $metric instanceof Gauge => true, // Gauges represent current state — never stale
             $metric instanceof Histogram => $metric->getCount() > 0,
             default => false,
         };
@@ -144,7 +144,7 @@ class MetricRegistry
         };
 
         try {
-            $this->cache()->lock($this->indexKey() . ':lock', 5)->get($callback);
+            $this->cache()->lock($this->indexKey().':lock', 5)->get($callback);
         } catch (\Throwable) {
             $callback();
         }
@@ -158,18 +158,21 @@ class MetricRegistry
     private function registrationKey(Metric $metric): string
     {
         $prefix = config('monitoring.cache.key_prefix', 'monitoring');
+
         return "{$prefix}:reg:{$metric->getType()}:{$metric->getName()}:{$metric->getLabelsHash()}";
     }
 
     private function indexKey(): string
     {
         $prefix = config('monitoring.cache.key_prefix', 'monitoring');
+
         return "{$prefix}:registry_index";
     }
 
     private function cache(): Repository
     {
         $store = config('monitoring.cache.store');
+
         return Cache::store($store);
     }
 }
