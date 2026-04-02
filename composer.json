@@ -36,7 +36,10 @@
         "psr-4": {
             "ModusDigital\\LaravelMonitoring\\": "src/",
             "ModusDigital\\LaravelMonitoring\\Database\\Factories\\": "database/factories/"
-        }
+        },
+        "files": [
+            "src/helpers.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -65,7 +68,7 @@
                 "ModusDigital\\LaravelMonitoring\\LaravelMonitoringServiceProvider"
             ],
             "aliases": {
-                "LaravelMonitoring": "ModusDigital\\LaravelMonitoring\\Facades\\LaravelMonitoring"
+                "Monitoring": "ModusDigital\\LaravelMonitoring\\Facades\\Monitoring"
             }
         }
     },
