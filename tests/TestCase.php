@@ -3,8 +3,8 @@
 namespace ModusDigital\LaravelMonitoring\Tests;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Orchestra\Testbench\TestCase as Orchestra;
 use ModusDigital\LaravelMonitoring\LaravelMonitoringServiceProvider;
+use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {
