@@ -1,6 +1,6 @@
 {
     "name": "modus-digital/laravel-monitoring",
-    "description": "Drop-in Prometheus + Loki monitoring for Laravel apps. Push metrics to Pushgateway and logs to Loki with zero extra dependencies.",
+    "description": "OTLP-first observability for Laravel — traces, logs, and metrics via Grafana Alloy.",
     "keywords": [
         "Modus Digital",
         "laravel",
@@ -34,8 +34,7 @@
     },
     "autoload": {
         "psr-4": {
-            "ModusDigital\\LaravelMonitoring\\": "src/",
-            "ModusDigital\\LaravelMonitoring\\Database\\Factories\\": "database/factories/"
+            "ModusDigital\\LaravelMonitoring\\": "src/"
         },
         "files": [
             "src/helpers.php"
@@ -65,7 +64,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "ModusDigital\\LaravelMonitoring\\LaravelMonitoringServiceProvider"
+                "ModusDigital\\LaravelMonitoring\\MonitoringServiceProvider"
             ],
             "aliases": {
                 "Monitoring": "ModusDigital\\LaravelMonitoring\\Facades\\Monitoring"
