@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-monitoring` will be documented in this file.
 
+## 1.2.1 - Span fix - 2026-04-03
+
+### What's Changed
+
+* docs: rewrite README for OTLP-first architecture by @AlexVanSteenhoven in https://github.com/modus-digital/laravel-monitoring/pull/5
+
+**Full Changelog**: https://github.com/modus-digital/laravel-monitoring/compare/1.2.0...1.2.1
+
 ## v1.2.0 - OTEL Update - 2026-04-03
 
 ### What's Changed
