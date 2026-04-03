@@ -610,7 +610,7 @@ class Span
 - [ ] **Step 6: Run tests to verify they pass**
 
 Run: `vendor/bin/pest tests/Tracing/SpanTest.php`
-Expected: All 14 tests PASS.
+Expected: All 13 tests PASS.
 
 - [ ] **Step 7: Run PHPStan**
 
@@ -2129,9 +2129,6 @@ use ModusDigital\LaravelMonitoring\Tracing\SpanKind;
 class OtlpTracer implements TracerContract
 {
     /** @var list<Span> */
-    private array $spans = [];
-
-    /** @var list<Span> */
     private array $spanStack = [];
 
     public function __construct(
@@ -2984,7 +2981,7 @@ class StartRequestTrace
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `vendor/bin/pest tests/Middleware/StartRequestTraceTest.php`
-Expected: All 6 tests PASS.
+Expected: All 7 tests PASS.
 
 - [ ] **Step 5: Run PHPStan**
 
