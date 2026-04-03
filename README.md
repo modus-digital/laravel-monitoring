@@ -5,18 +5,19 @@
 [![GitHub Code Style Action Status](https://img.shields.io/github/actions/workflow/status/modus-digital/laravel-monitoring/fix-php-code-style-issues.yml?branch=main&label=code%20style&style=flat-square)](https://github.com/modus-digital/laravel-monitoring/actions?query=workflow%3A"Fix+PHP+code+style+issues"+branch%3Amain)
 [![Total Downloads](https://img.shields.io/packagist/dt/modus-digital/laravel-monitoring.svg?style=flat-square)](https://packagist.org/packages/modus-digital/laravel-monitoring)
 
-Drop-in Prometheus + Loki monitoring for Laravel apps. Push metrics to Pushgateway and ship logs to Loki with zero extra dependencies.
+OTLP-first observability for Laravel — traces, logs, and metrics via Grafana Alloy.
 
-- Automatic HTTP request metrics (counter + duration histogram)
-- Custom counters, gauges, and histograms via a simple API
-- Scheduled push to Prometheus Pushgateway
-- Loki log shipping as a native Laravel log channel
-- Works with any Laravel cache driver (Redis, Memcached, database, file)
+- Distributed tracing with W3C `traceparent` propagation
+- OTLP log shipping as a native Laravel log channel
+- Custom counters, gauges, and histograms
+- All telemetry exported as OTLP/JSON to Grafana Alloy (or any OTLP-compatible collector)
+- No scheduler, no cron — everything flushes per-request automatically
 
 ## Requirements
 
 - PHP 8.4+
 - Laravel 12 or 13
+- An OTLP-compatible collector (e.g., [Grafana Alloy](https://grafana.com/docs/alloy/))
 
 ## Installation
 
@@ -35,17 +36,10 @@ php artisan vendor:publish --tag="monitoring-config"
 Add these to your `.env`:
 
 ```env
-# Pushgateway
 MONITORING_ENABLED=true
-PROMETHEUS_PUSHGATEWAY_URL=http://pushgateway:9091
-MONITORING_PUSH_SCHEDULE=everyMinute
-
-# Loki
-LOKI_ENABLED=true
-LOKI_ENTRYPOINT=http://loki:3100
-
-# Cache store for metrics (null = default cache driver)
-MONITORING_CACHE_STORE=redis
+MONITORING_OTLP_ENDPOINT=http://alloy:4318
+MONITORING_SERVICE_NAME=my-app
+MONITORING_ENVIRONMENT=production
 ```
 
 ### Full config reference
@@ -53,62 +47,94 @@ MONITORING_CACHE_STORE=redis
 ```php
 // config/monitoring.php
 return [
-    'pushgateway' => [
-        'enabled'  => env('MONITORING_ENABLED', true),
-        'url'      => env('PROMETHEUS_PUSHGATEWAY_URL', '127.0.0.1:9091'),
-        'auth'     => env('PROMETHEUS_PUSHGATEWAY_AUTH', ''),
-        'job_name' => env('MONITORING_JOB_NAME', null),     // null = config('app.name')
-        'schedule' => env('MONITORING_PUSH_SCHEDULE', 'everyMinute'), // null to disable
+    'enabled' => env('MONITORING_ENABLED', true),
+
+    'service' => [
+        'name'        => env('MONITORING_SERVICE_NAME'),        // defaults to config('app.name')
+        'environment' => env('MONITORING_ENVIRONMENT'),          // defaults to config('app.env')
+        'instance_id' => env('MONITORING_SERVICE_INSTANCE_ID'),  // defaults to config('app.url')
     ],
 
-    'loki' => [
-        'enabled' => env('LOKI_ENABLED', true),
-        'url'     => env('LOKI_ENTRYPOINT'),
-        'auth'    => env('LOKI_AUTH'),
-        'level'   => env('LOG_LEVEL', 'debug'),
-        'labels'  => [
-            'app' => env('APP_NAME', 'laravel'),
-            'env' => env('APP_ENV', 'production'),
-        ],
+    'otlp' => [
+        'endpoint' => env('MONITORING_OTLP_ENDPOINT', 'http://127.0.0.1:4318'),
+        'headers'  => env('MONITORING_OTLP_HEADERS'),  // comma-separated: 'X-Scope-OrgID=tenant1,Authorization=Basic abc'
+        'timeout'  => env('MONITORING_OTLP_TIMEOUT', 3),
     ],
 
+    'traces' => [
+        'enabled'     => env('MONITORING_TRACES_ENABLED', true),
+        'sample_rate' => env('MONITORING_TRACE_SAMPLE_RATE', 1.0),  // 0.0 to 1.0
+    ],
+
+    'logs' => [
+        'enabled' => env('MONITORING_LOGS_ENABLED', true),
+    ],
+
+    'metrics' => [
+        'enabled' => env('MONITORING_METRICS_ENABLED', true),
+    ],
+
+    // Routes to exclude from tracing. Matches against both route names and URL paths.
     'middleware' => [
-        'auto_register' => env('MONITORING_AUTO_MIDDLEWARE', true),
-        'exclude' => [
-            '_debugbar', '_ignition', 'telescope', 'horizon', 'livewire/update',
-        ],
-    ],
-
-    'cache' => [
-        'store'      => env('MONITORING_CACHE_STORE', null),
-        'key_prefix' => env('MONITORING_CACHE_PREFIX', 'monitoring'),
-        'ttl'        => 3600,
+        'exclude' => [],
     ],
 ];
 ```
 
+## Middleware Setup
+
+Register the `StartRequestTrace` middleware to automatically trace HTTP requests:
+
+```php
+// bootstrap/app.php (Laravel 12+)
+->withMiddleware(function (Middleware $middleware) {
+    $middleware->append(\ModusDigital\LaravelMonitoring\Http\Middleware\StartRequestTrace::class);
+})
+```
+
+This middleware:
+- Creates a root span for each HTTP request with `SERVER` kind
+- Parses incoming `traceparent` headers for distributed trace propagation
+- Records `http.method`, `http.route`, `http.status_code`, and `http.status_group` attributes
+- Sets `ERROR` status on 5xx responses
+- Populates a `RequestContext` singleton for log correlation
+- Respects the `traces.sample_rate` config and upstream sampling decisions
+- Flushes all telemetry on `terminate()` (after the response is sent)
+
 ## Usage
 
-### Automatic HTTP metrics
+### Tracing
 
-Out of the box, the package records two metrics for every HTTP request:
+Wrap operations in spans using the `Monitoring` facade:
 
-- `http_requests_total` (counter) — labeled by method, route, status, status_group
-- `http_request_duration_ms` (histogram) — labeled by method, route
+```php
+use ModusDigital\LaravelMonitoring\Facades\Monitoring;
 
-This is handled by the `RecordMetrics` middleware, which is auto-registered globally. Disable it with `MONITORING_AUTO_MIDDLEWARE=false`.
+// Automatic span — wraps a closure, records exceptions, rethrows
+$result = Monitoring::span('orders.process', function () {
+    return Order::process($data);
+});
 
-### Custom metrics
+// Manual span — for more control
+$span = Monitoring::startSpan('external.api.call');
+$span->setAttribute('api.endpoint', 'https://api.example.com/v1/users');
+try {
+    $response = Http::get('https://api.example.com/v1/users');
+    $span->setAttribute('http.status_code', $response->status());
+} finally {
+    $span->end();
+}
+```
 
-Use the `Monitoring` facade or the `monitoring()` helper anywhere in your app:
+### Custom Metrics
+
+Use the `Monitoring` facade or the `monitoring()` helper:
 
 #### Counters
 
 Counters only go up. Use them for totals (requests, orders, errors).
 
 ```php
-use ModusDigital\LaravelMonitoring\Facades\Monitoring;
-
 Monitoring::counter('orders_total', ['payment_method' => 'stripe'])->increment();
 Monitoring::counter('orders_total', ['payment_method' => 'stripe'])->incrementBy(5);
 
@@ -124,8 +150,6 @@ Gauges go up and down. Use them for current values (queue depth, active users).
 Monitoring::gauge('queue_depth', ['queue' => 'emails'])->set(42);
 Monitoring::gauge('queue_depth', ['queue' => 'emails'])->increment();
 Monitoring::gauge('queue_depth', ['queue' => 'emails'])->decrement();
-Monitoring::gauge('queue_depth', ['queue' => 'emails'])->incrementBy(5);
-Monitoring::gauge('queue_depth', ['queue' => 'emails'])->decrementBy(3);
 ```
 
 #### Histograms
@@ -141,97 +165,74 @@ Monitoring::histogram('payload_size_bytes', [], [100, 500, 1000, 5000, 10000])->
 
 ### Labels
 
-All metric types accept an optional labels array. Labels are key-value pairs that add dimensions to your metrics:
+All metric types accept an optional labels array. Label order doesn't matter — `['a' => '1', 'b' => '2']` and `['b' => '2', 'a' => '1']` resolve to the same metric.
 
-```php
-Monitoring::counter('api_errors_total', [
-    'endpoint' => '/api/users',
-    'error_type' => 'validation',
-])->increment();
-```
+### Flushing
 
-Label order doesn't matter — `['a' => '1', 'b' => '2']` and `['b' => '2', 'a' => '1']` resolve to the same metric.
+Telemetry is flushed automatically:
+- **Traces and logs**: Flushed on `terminate()` after each HTTP response
+- **Metrics in queue jobs**: Flushed automatically via `Queue::after` and `Queue::failing` hooks
+- **Manual flush**: Call `Monitoring::flush()` to export all pending traces and metrics
 
-### Pushing metrics
+No scheduler or cron job is needed.
 
-Metrics are pushed to Prometheus Pushgateway via the `monitoring:push` command. By default, this is auto-scheduled every minute when pushgateway is enabled.
+## Log Shipping
 
-```bash
-# Manual push
-php artisan monitoring:push
-
-# Preview what would be pushed (no HTTP call)
-php artisan monitoring:push --dry-run
-```
-
-To change the schedule, set `MONITORING_PUSH_SCHEDULE` to any Laravel schedule method name (`everyFiveMinutes`, `everyTenMinutes`, etc.) or `null` to disable auto-scheduling.
-
-### Prometheus output example
-
-```
-# HELP http_requests_total http_requests_total
-# TYPE http_requests_total counter
-http_requests_total{method="GET",route="/api/users",status="200",status_group="2xx"} 1523
-
-# HELP queue_depth queue_depth
-# TYPE queue_depth gauge
-queue_depth{queue="emails"} 17
-
-# HELP http_request_duration_ms http_request_duration_ms
-# TYPE http_request_duration_ms histogram
-http_request_duration_ms_bucket{method="GET",route="/api/users",le="50"} 12
-http_request_duration_ms_bucket{method="GET",route="/api/users",le="100"} 45
-http_request_duration_ms_bucket{method="GET",route="/api/users",le="+Inf"} 50
-http_request_duration_ms_sum{method="GET",route="/api/users"} 4523.5
-http_request_duration_ms_count{method="GET",route="/api/users"} 50
-```
-
-### Grafana queries
-
-Once metrics are in Prometheus, use these PromQL queries in Grafana:
-
-```promql
-# Request rate by status group
-sum by (status_group) (rate(http_requests_total[5m]))
-
-# Average response time
-rate(http_request_duration_ms_sum[5m]) / rate(http_request_duration_ms_count[5m])
-
-# P95 response time
-histogram_quantile(0.95, rate(http_request_duration_ms_bucket[5m]))
-
-# Error rate
-sum(rate(http_requests_total{status_group="5xx"}[5m])) / sum(rate(http_requests_total[5m]))
-```
-
-## Loki log shipping
-
-The package registers a `loki` log channel automatically. Add it to your logging stack:
+The package registers a `monitoring` log channel automatically. Add it to your logging stack:
 
 ```php
 // config/logging.php
 'channels' => [
     'stack' => [
         'driver' => 'stack',
-        'channels' => ['daily', 'loki'],
+        'channels' => ['daily', 'monitoring'],
     ],
 ],
 ```
 
-Each log entry is shipped with contextual data: message, route, method, user_id, request_id, and configurable stream labels (app, env, level, channel).
+Log records are automatically enriched with trace context (`trace_id`, `span_id`, `request_id`, `route`, `method`, `user_id`) so you can correlate logs with traces in Grafana.
 
-## How it works
+## How It Works
 
-1. The `RecordMetrics` middleware records HTTP counters and duration histograms on every request
-2. Your app records custom metrics via the `Monitoring` facade
-3. All metrics are buffered in Laravel's cache (any driver)
-4. The scheduled `monitoring:push` command reads all metrics, formats them as Prometheus text, and POSTs to Pushgateway
-5. Counters and histograms are reset after each push; gauges persist (they represent current state)
+1. The `StartRequestTrace` middleware creates a root span and `RequestContext` for each request
+2. Your app records custom spans and metrics via the `Monitoring` facade
+3. The `MonitoringLogProcessor` enriches log records with trace context
+4. On `terminate()`, the middleware ends the root span and flushes traces via OTLP/JSON to `/v1/traces`
+5. The `OtlpLogHandler` buffers log records and flushes them to `/v1/logs` on close
+6. Metrics are exported to `/v1/metrics` on flush — all in-memory, no cache driver needed
+
+All OTLP payloads include resource attributes (`service.name`, `deployment.environment`, `service.instance.id`) for identification in Grafana.
+
+## Architecture
+
+```
+Laravel App
+  ├── StartRequestTrace (middleware)
+  │     ├── Creates root Span (SERVER kind)
+  │     ├── Populates RequestContext
+  │     └── Flushes on terminate()
+  ├── Monitoring Facade
+  │     ├── span() / startSpan()  → TracerContract → OtlpTracer
+  │     ├── counter() / gauge() / histogram()  → MetricRegistry
+  │     └── flush()  → exports traces + metrics
+  ├── Log Channel ("monitoring")
+  │     ├── MonitoringLogProcessor (enriches with trace context)
+  │     └── OtlpLogHandler → OtlpLogExporter
+  └── OtlpTransport (shared HTTP/JSON client)
+        ├── POST /v1/traces   (traces)
+        ├── POST /v1/logs     (logs)
+        └── POST /v1/metrics  (metrics)
+              ↓
+        Grafana Alloy → Tempo / Loki / Mimir
+```
 
 ## Testing
 
 ```bash
-composer test
+composer test              # Run tests (Pest)
+composer test-coverage     # Tests with coverage
+composer analyse           # PHPStan level 8
+composer format            # Laravel Pint code style
 ```
 
 ## Changelog
