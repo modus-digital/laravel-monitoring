@@ -41,7 +41,7 @@ class Span
         $this->parentSpanId = $parentSpanId;
         $this->traceFlags = $traceFlags;
         $this->kind = $kind;
-        $this->startTimeNano = (int) hrtime(true);
+        $this->startTimeNano = self::nowUnixNano();
     }
 
     public function setAttribute(string $key, mixed $value): self
@@ -63,7 +63,7 @@ class Span
         $this->events[] = [
             'name' => $name,
             'attributes' => $attributes,
-            'timeNano' => (int) hrtime(true),
+            'timeNano' => self::nowUnixNano(),
         ];
 
         return $this;
@@ -90,7 +90,7 @@ class Span
     public function end(): void
     {
         if ($this->endTimeNano === null) {
-            $this->endTimeNano = (int) hrtime(true);
+            $this->endTimeNano = self::nowUnixNano();
         }
     }
 
@@ -115,7 +115,7 @@ class Span
             'name' => $this->name,
             'kind' => $this->kind->value,
             'startTimeUnixNano' => (string) $this->startTimeNano,
-            'endTimeUnixNano' => (string) ($this->endTimeNano ?? (int) hrtime(true)),
+            'endTimeUnixNano' => (string) ($this->endTimeNano ?? self::nowUnixNano()),
             'attributes' => array_map(
                 fn (string $key, mixed $value) => [
                     'key' => $key,
@@ -140,6 +140,11 @@ class Span
             'traceState' => '',
             'flags' => $this->traceFlags,
         ];
+    }
+
+    private static function nowUnixNano(): int
+    {
+        return (int) (microtime(true) * 1_000_000_000);
     }
 
     /** @return array{stringValue?: string, intValue?: string, doubleValue?: float, boolValue?: bool} */

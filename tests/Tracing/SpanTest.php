@@ -37,13 +37,15 @@ it('defaults to traceFlags 1 (sampled)', function () {
     expect($span->traceFlags)->toBe(1);
 });
 
-it('records start time on creation', function () {
-    $before = hrtime(true);
+it('records start time as unix epoch nanoseconds', function () {
+    $before = (int) (microtime(true) * 1_000_000_000);
     $span = new Span('test.span');
-    $after = hrtime(true);
+    $after = (int) (microtime(true) * 1_000_000_000);
 
     expect($span->startTimeNano)->toBeGreaterThanOrEqual($before);
     expect($span->startTimeNano)->toBeLessThanOrEqual($after);
+    // Sanity check: should be a recent Unix timestamp in nanoseconds (year 2024+)
+    expect($span->startTimeNano)->toBeGreaterThan(1_700_000_000_000_000_000);
 });
 
 it('can set and get attributes', function () {
