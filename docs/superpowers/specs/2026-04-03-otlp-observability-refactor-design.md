@@ -87,6 +87,10 @@ return [
 
 Three service identity fields: `name`, `environment`, `instance_id`. These become OTLP resource attributes on all telemetry.
 
+**Note:** The `config()` calls used as defaults (e.g., `config('app.name')`) may not resolve correctly when config is cached. The service provider resolves these at runtime — if the env var is unset and the config value is null, it falls back to `config('app.name')` etc. at boot time.
+
+**Header format:** `MONITORING_OTLP_HEADERS` accepts comma-separated `key=value` pairs, e.g., `Authorization=Basic abc123,X-Scope-OrgID=tenant1`. Parsed by `OtlpTransport` into an associative array.
+
 ## Contracts
 
 ### TracerContract
@@ -129,6 +133,8 @@ Value object representing a trace span:
 - `traceId` (32-char hex) — shared across all spans in a trace
 - `spanId` (16-char hex) — unique per span
 - `parentSpanId` (nullable) — for child spans
+- `traceFlags` (int, default `1` = sampled) — propagated via W3C `traceparent`
+- `kind` (SpanKind enum: `SERVER`, `CLIENT`, `INTERNAL`, `PRODUCER`, `CONSUMER`, default `INTERNAL`)
 - `name`, `startTime`, `endTime`
 - `setAttribute(string $key, mixed $value): self`
 - `addEvent(string $name, array $attributes = []): self`
@@ -136,14 +142,43 @@ Value object representing a trace span:
 - `end(): void`
 - `child(string $name, array $attributes = []): self`
 
+### SpanKind Enum
+
+```php
+enum SpanKind: int
+{
+    case INTERNAL = 1;
+    case SERVER   = 2;
+    case CLIENT   = 3;
+    case PRODUCER = 4;
+    case CONSUMER = 5;
+}
+```
+
+The middleware creates root spans with `SpanKind::SERVER`. Manual child spans default to `SpanKind::INTERNAL`.
+
+### SpanStatus Enum
+
+```php
+enum SpanStatus: int
+{
+    case UNSET = 0;
+    case OK    = 1;
+    case ERROR = 2;
+}
+```
+
+Maps to OTLP `status.code`. The middleware sets `ERROR` for 5xx responses, `UNSET` otherwise (per OTLP convention, `OK` is only set explicitly by application code).
+
 ### StartRequestTrace Middleware
 
 Replaces the current `RecordMetrics` middleware.
 
 On handle:
-1. Read incoming `traceparent` header (W3C Trace Context) for distributed trace continuation
-2. Start root span named `http.request`
-3. Populate RequestContext singleton (trace_id, span_id, request_id, route, method)
+1. Read incoming `traceparent` header (W3C Trace Context, format: `{version}-{trace-id}-{parent-id}-{trace-flags}`) for distributed trace continuation
+2. Start root span named `http.request` with `SpanKind::SERVER`
+3. If incoming `traceparent` has sampled flag unset AND local sample_rate would not sample, skip tracing for this request
+4. Populate RequestContext singleton (trace_id, span_id, request_id, route, method)
 
 On terminate:
 1. Set response attributes: `http.status_code`, `http.status_group`
@@ -243,9 +278,12 @@ class MetricRegistry
 ### Flush Strategy
 
 - HTTP requests: middleware `terminate()` flushes alongside traces
-- Queue jobs / commands: `Monitoring::flush()` or auto-flush on registry `__destruct`
+- Queue jobs: hook into Laravel's `Queue::after` and `Queue::failing` events for automatic flush
+- Commands: `register_shutdown_function` as safety net, or explicit `Monitoring::flush()`
 - OTLP export: `{otlp.endpoint}/v1/metrics`
-- Counters use cumulative temporality, gauges use gauge temporality, histograms use delta temporality
+- All metric types use **delta temporality** — each flush exports only observations since the last flush. Since metrics are in-memory and scoped to a request/job lifecycle, every flush is naturally a delta. Alloy/Prometheus handles aggregation into cumulative series.
+
+**Data loss policy:** Telemetry is fire-and-forget. If Alloy is unavailable, in-memory data is lost. This is acceptable — observability data is best-effort by design. No retry, no disk buffering.
 
 ### Facade API
 
@@ -351,6 +389,160 @@ tests/
 - Architecture tests: no dd/dump/ray
 - PHPStan level 8, Laravel Pint formatting
 - CI matrix: PHP 8.4/8.5 x Laravel 12/13
+
+## Sampling
+
+Sampling is decided per-request in the middleware:
+
+1. If an incoming `traceparent` header has the **sampled flag set** (`01`), the request is always traced — upstream made the decision, we respect it.
+2. If no incoming `traceparent` or sampled flag is unset, the local `traces.sample_rate` config determines whether to sample (probabilistic, `rand() / getrandmax() < sample_rate`).
+3. When a request is **not sampled**: no spans are created, but **metrics and logs are still collected**. Observability signals are independent — you may want logs without traces.
+4. The sampling decision is propagated in the `traceparent` response header and on any outgoing `traceparent` headers (future scope for HTTP client tracing).
+
+## Composer.json Updates
+
+- Rename provider: `LaravelMonitoringServiceProvider` → `MonitoringServiceProvider` in `extra.laravel.providers`
+- No new dependencies required (Laravel Http client is part of the framework)
+
+## OTLP JSON Payload Examples
+
+### Traces (`/v1/traces`)
+
+```json
+{
+  "resourceSpans": [{
+    "resource": {
+      "attributes": [
+        { "key": "service.name", "value": { "stringValue": "my-app" } },
+        { "key": "deployment.environment", "value": { "stringValue": "production" } },
+        { "key": "service.instance.id", "value": { "stringValue": "https://my-app.com" } }
+      ]
+    },
+    "scopeSpans": [{
+      "scope": { "name": "laravel-monitoring", "version": "2.0.0" },
+      "spans": [{
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "spanId": "00f067aa0ba902b7",
+        "parentSpanId": "",
+        "name": "http.request",
+        "kind": 2,
+        "startTimeUnixNano": "1712150400000000000",
+        "endTimeUnixNano": "1712150400150000000",
+        "attributes": [
+          { "key": "http.method", "value": { "stringValue": "GET" } },
+          { "key": "http.route", "value": { "stringValue": "/api/orders" } },
+          { "key": "http.status_code", "value": { "intValue": "200" } },
+          { "key": "http.status_group", "value": { "stringValue": "2xx" } }
+        ],
+        "status": { "code": 0 },
+        "traceState": "",
+        "flags": 1
+      }]
+    }]
+  }]
+}
+```
+
+### Logs (`/v1/logs`)
+
+```json
+{
+  "resourceLogs": [{
+    "resource": {
+      "attributes": [
+        { "key": "service.name", "value": { "stringValue": "my-app" } },
+        { "key": "deployment.environment", "value": { "stringValue": "production" } },
+        { "key": "service.instance.id", "value": { "stringValue": "https://my-app.com" } }
+      ]
+    },
+    "scopeLogs": [{
+      "scope": { "name": "laravel-monitoring" },
+      "logRecords": [{
+        "timeUnixNano": "1712150400000000000",
+        "severityNumber": 9,
+        "severityText": "INFO",
+        "body": { "stringValue": "Order created successfully" },
+        "attributes": [
+          { "key": "trace_id", "value": { "stringValue": "4bf92f3577b34da6a3ce929d0e0e4736" } },
+          { "key": "span_id", "value": { "stringValue": "00f067aa0ba902b7" } },
+          { "key": "request_id", "value": { "stringValue": "req-abc-123" } },
+          { "key": "route", "value": { "stringValue": "/api/orders" } },
+          { "key": "user_id", "value": { "intValue": "42" } }
+        ],
+        "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+        "spanId": "00f067aa0ba902b7"
+      }]
+    }]
+  }]
+}
+```
+
+### Metrics (`/v1/metrics`)
+
+```json
+{
+  "resourceMetrics": [{
+    "resource": {
+      "attributes": [
+        { "key": "service.name", "value": { "stringValue": "my-app" } },
+        { "key": "deployment.environment", "value": { "stringValue": "production" } },
+        { "key": "service.instance.id", "value": { "stringValue": "https://my-app.com" } }
+      ]
+    },
+    "scopeMetrics": [{
+      "scope": { "name": "laravel-monitoring" },
+      "metrics": [
+        {
+          "name": "orders_processed",
+          "sum": {
+            "dataPoints": [{
+              "startTimeUnixNano": "1712150400000000000",
+              "timeUnixNano": "1712150400150000000",
+              "asInt": "5",
+              "attributes": [
+                { "key": "status", "value": { "stringValue": "completed" } }
+              ]
+            }],
+            "aggregationTemporality": 1,
+            "isMonotonic": true
+          }
+        },
+        {
+          "name": "queue_depth",
+          "gauge": {
+            "dataPoints": [{
+              "timeUnixNano": "1712150400150000000",
+              "asInt": "42",
+              "attributes": [
+                { "key": "queue", "value": { "stringValue": "default" } }
+              ]
+            }]
+          }
+        },
+        {
+          "name": "payment_duration_ms",
+          "histogram": {
+            "dataPoints": [{
+              "startTimeUnixNano": "1712150400000000000",
+              "timeUnixNano": "1712150400150000000",
+              "count": "3",
+              "sum": 690.0,
+              "bucketCounts": ["0", "0", "0", "1", "2", "3", "3", "3", "3", "3", "3", "3"],
+              "explicitBounds": [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+              "attributes": [
+                { "key": "provider", "value": { "stringValue": "stripe" } }
+              ]
+            }],
+            "aggregationTemporality": 1
+          }
+        }
+      ]
+    }]
+  }]
+}
+```
+
+**Note:** `aggregationTemporality: 1` = DELTA. All metrics use delta temporality since they are flushed per request lifecycle.
 
 ## What's NOT In Scope
 
