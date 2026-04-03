@@ -15,8 +15,8 @@ class Histogram extends Metric
     private array $boundaries;
 
     /**
-     * @param array<string, string> $labels
-     * @param list<int>|null $buckets
+     * @param  array<string, string>  $labels
+     * @param  list<int>|null  $buckets
      */
     public function __construct(string $name, array $labels = [], ?array $buckets = null)
     {

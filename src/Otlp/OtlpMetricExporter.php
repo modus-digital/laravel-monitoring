@@ -118,7 +118,7 @@ class OtlpMetricExporter implements MetricExporterContract
     }
 
     /**
-     * @param array<string, string> $labels
+     * @param  array<string, string>  $labels
      * @return list<array{key: string, value: array{stringValue: string}}>
      */
     private static function formatLabels(array $labels): array

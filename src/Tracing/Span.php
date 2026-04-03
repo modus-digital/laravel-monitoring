@@ -5,12 +5,19 @@ namespace ModusDigital\LaravelMonitoring\Tracing;
 class Span
 {
     public readonly string $traceId;
+
     public readonly string $spanId;
+
     public readonly ?string $parentSpanId;
+
     public readonly int $traceFlags;
+
     public readonly SpanKind $kind;
+
     public readonly string $name;
+
     public readonly int $startTimeNano;
+
     public ?int $endTimeNano = null;
 
     /** @var array<string, mixed> */

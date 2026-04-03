@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Http;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpTracer;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpTransport;
 use ModusDigital\LaravelMonitoring\Tracing\SpanKind;
-use ModusDigital\LaravelMonitoring\Tracing\SpanStatus;
 
 beforeEach(function () {
     Http::fake(['*' => Http::response('', 200)]);

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpTransport;
 
@@ -55,7 +56,7 @@ it('does not throw on transport failure', function () {
 
 it('does not throw on connection error', function () {
     Http::fake(function () {
-        throw new \Illuminate\Http\Client\ConnectionException('Connection refused');
+        throw new ConnectionException('Connection refused');
     });
 
     $transport = new OtlpTransport;

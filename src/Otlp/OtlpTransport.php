@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Log;
 class OtlpTransport
 {
     /**
-     * @param string $path OTLP endpoint path (e.g., /v1/traces)
-     * @param array<string, mixed> $payload JSON payload
+     * @param  string  $path  OTLP endpoint path (e.g., /v1/traces)
+     * @param  array<string, mixed>  $payload  JSON payload
      */
     public function send(string $path, array $payload): void
     {

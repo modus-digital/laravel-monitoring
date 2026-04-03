@@ -1,11 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Http;
-use Monolog\Level;
-use Monolog\LogRecord;
 use ModusDigital\LaravelMonitoring\Logging\OtlpLogHandler;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpLogExporter;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpTransport;
+use Monolog\Level;
+use Monolog\LogRecord;
 
 beforeEach(function () {
     Http::fake(['*' => Http::response('', 200)]);
@@ -19,7 +19,7 @@ it('buffers log records and flushes on close', function () {
     $handler = new OtlpLogHandler(new OtlpLogExporter(new OtlpTransport));
 
     $record = new LogRecord(
-        datetime: new \DateTimeImmutable,
+        datetime: new DateTimeImmutable,
         channel: 'test',
         level: Level::Info,
         message: 'Hello world',
@@ -44,7 +44,7 @@ it('maps Monolog levels to OTLP severity numbers', function () {
     $handler = new OtlpLogHandler(new OtlpLogExporter(new OtlpTransport));
 
     $record = new LogRecord(
-        datetime: new \DateTimeImmutable,
+        datetime: new DateTimeImmutable,
         channel: 'test',
         level: Level::Error,
         message: 'Something failed',

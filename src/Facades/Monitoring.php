@@ -12,6 +12,7 @@ use ModusDigital\LaravelMonitoring\Metrics\Histogram;
 use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 use ModusDigital\LaravelMonitoring\Tracing\Span;
 use ModusDigital\LaravelMonitoring\Tracing\SpanKind;
+use ModusDigital\LaravelMonitoring\Tracing\SpanStatus;
 
 /**
  * @method static Counter counter(string $name, array<string, string> $labels = [])
@@ -42,7 +43,7 @@ class Monitoring extends Facade
                 'exception.type' => get_class($e),
                 'exception.message' => $e->getMessage(),
             ]);
-            $span->setStatus(\ModusDigital\LaravelMonitoring\Tracing\SpanStatus::ERROR);
+            $span->setStatus(SpanStatus::ERROR);
             $span->end();
 
             throw $e;

@@ -34,8 +34,8 @@ class MetricRegistry
     }
 
     /**
-     * @param array<string, string> $labels
-     * @param list<int>|null $buckets
+     * @param  array<string, string>  $labels
+     * @param  list<int>|null  $buckets
      */
     public function histogram(string $name, array $labels = [], ?array $buckets = null): Histogram
     {

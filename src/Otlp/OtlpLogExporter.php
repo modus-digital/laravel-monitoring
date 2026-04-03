@@ -36,7 +36,7 @@ class OtlpLogExporter implements LogExporterContract
     }
 
     /**
-     * @param array<string, mixed> $record
+     * @param  array<string, mixed>  $record
      * @return array<string, mixed>
      */
     private function formatLogRecord(array $record): array
@@ -61,7 +61,7 @@ class OtlpLogExporter implements LogExporterContract
     }
 
     /**
-     * @param array<string, mixed> $attributes
+     * @param  array<string, mixed>  $attributes
      * @return list<array{key: string, value: array<string, mixed>}>
      */
     private function formatAttributes(array $attributes): array

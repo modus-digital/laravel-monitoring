@@ -5,7 +5,9 @@ namespace ModusDigital\LaravelMonitoring\Context;
 class RequestContext
 {
     public ?string $route = null;
+
     public ?string $method = null;
+
     public ?int $userId = null;
 
     public function __construct(

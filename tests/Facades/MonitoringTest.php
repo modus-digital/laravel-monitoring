@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Http;
 use ModusDigital\LaravelMonitoring\Facades\Monitoring;
-use ModusDigital\LaravelMonitoring\Tracing\SpanStatus;
 
 beforeEach(function () {
     Http::fake(['*' => Http::response('', 200)]);
@@ -26,9 +25,9 @@ it('wraps a closure in a span', function () {
 it('records exception in span and rethrows', function () {
     expect(function () {
         Monitoring::span('failing.operation', function () {
-            throw new \RuntimeException('Test error');
+            throw new RuntimeException('Test error');
         });
-    })->toThrow(\RuntimeException::class, 'Test error');
+    })->toThrow(RuntimeException::class, 'Test error');
 });
 
 it('starts a manual span', function () {

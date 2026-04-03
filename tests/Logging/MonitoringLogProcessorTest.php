@@ -1,9 +1,9 @@
 <?php
 
-use Monolog\LogRecord;
-use Monolog\Level;
 use ModusDigital\LaravelMonitoring\Context\RequestContext;
 use ModusDigital\LaravelMonitoring\Logging\MonitoringLogProcessor;
+use Monolog\Level;
+use Monolog\LogRecord;
 
 it('enriches log record with trace context', function () {
     $ctx = new RequestContext(
@@ -19,7 +19,7 @@ it('enriches log record with trace context', function () {
 
     $processor = new MonitoringLogProcessor;
     $record = new LogRecord(
-        datetime: new \DateTimeImmutable,
+        datetime: new DateTimeImmutable,
         channel: 'test',
         level: Level::Info,
         message: 'Test message',
@@ -38,7 +38,7 @@ it('enriches log record with trace context', function () {
 it('handles missing RequestContext gracefully', function () {
     $processor = new MonitoringLogProcessor;
     $record = new LogRecord(
-        datetime: new \DateTimeImmutable,
+        datetime: new DateTimeImmutable,
         channel: 'test',
         level: Level::Info,
         message: 'Test message',
