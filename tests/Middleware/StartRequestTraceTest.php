@@ -8,7 +8,6 @@ use ModusDigital\LaravelMonitoring\Contracts\TracerContract;
 use ModusDigital\LaravelMonitoring\Http\Middleware\StartRequestTrace;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpTracer;
 use ModusDigital\LaravelMonitoring\Otlp\OtlpTransport;
-use ModusDigital\LaravelMonitoring\Tracing\SpanKind;
 
 beforeEach(function () {
     Http::fake(['*' => Http::response('', 200)]);
