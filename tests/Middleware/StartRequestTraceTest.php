@@ -22,7 +22,7 @@ beforeEach(function () {
     config()->set('monitoring.middleware.exclude', []);
 });
 
-it('creates a root span with SERVER kind', function () {
+it('creates a root span with SERVER kind and flushes', function () {
     $tracer = new OtlpTracer(new OtlpTransport);
     $this->app->instance(TracerContract::class, $tracer);
 
@@ -33,10 +33,12 @@ it('creates a root span with SERVER kind', function () {
         return new Response('OK', 200);
     });
 
-    $span = $tracer->activeSpan();
-    expect($span)->not->toBeNull();
-    expect($span->kind)->toBe(SpanKind::SERVER);
-    expect($span->name)->toBe('http.request');
+    // Span is flushed inline — verify it was sent
+    Http::assertSent(function ($request) {
+        $span = $request->data()['resourceSpans'][0]['scopeSpans'][0]['spans'][0] ?? null;
+
+        return $span && $span['name'] === 'http.request' && $span['kind'] === 2; // SERVER
+    });
 });
 
 it('populates RequestContext', function () {
@@ -55,18 +57,15 @@ it('populates RequestContext', function () {
     expect($ctx->method)->toBe('POST');
 });
 
-it('sets response attributes on terminate', function () {
+it('sets response attributes including status code', function () {
     $tracer = new OtlpTracer(new OtlpTransport);
     $this->app->instance(TracerContract::class, $tracer);
 
     $middleware = new StartRequestTrace($tracer);
     $request = Request::create('/api/orders', 'GET');
-    $response = new Response('Not Found', 404);
 
-    $middleware->handle($request, fn () => $response);
-    $middleware->terminate($request, $response);
+    $middleware->handle($request, fn () => new Response('Not Found', 404));
 
-    // Span should have been flushed
     Http::assertSent(function ($request) {
         $span = $request->data()['resourceSpans'][0]['scopeSpans'][0]['spans'][0] ?? null;
         if (! $span) {
@@ -92,9 +91,13 @@ it('continues trace from incoming traceparent header', function () {
 
     $middleware->handle($request, fn () => new Response('OK', 200));
 
-    $span = $tracer->activeSpan();
-    expect($span->traceId)->toBe($traceId);
-    expect($span->parentSpanId)->toBe($parentSpanId);
+    Http::assertSent(function ($request) use ($traceId, $parentSpanId) {
+        $span = $request->data()['resourceSpans'][0]['scopeSpans'][0]['spans'][0] ?? null;
+
+        return $span
+            && $span['traceId'] === $traceId
+            && $span['parentSpanId'] === $parentSpanId;
+    });
 });
 
 it('respects upstream sampled=0 flag', function () {
@@ -109,7 +112,7 @@ it('respects upstream sampled=0 flag', function () {
 
     $middleware->handle($request, fn () => new Response('OK', 200));
 
-    expect($tracer->activeSpan())->toBeNull();
+    Http::assertNothingSent();
 });
 
 it('skips excluded routes', function () {
@@ -123,7 +126,7 @@ it('skips excluded routes', function () {
 
     $response = $middleware->handle($request, fn () => new Response('OK', 200));
 
-    expect($tracer->activeSpan())->toBeNull();
+    Http::assertNothingSent();
     expect($response->getStatusCode())->toBe(200);
 });
 
@@ -133,10 +136,8 @@ it('sets ERROR status on 5xx response', function () {
 
     $middleware = new StartRequestTrace($tracer);
     $request = Request::create('/api/orders', 'GET');
-    $response = new Response('Server Error', 500);
 
-    $middleware->handle($request, fn () => $response);
-    $middleware->terminate($request, $response);
+    $middleware->handle($request, fn () => new Response('Server Error', 500));
 
     Http::assertSent(function ($request) {
         $span = $request->data()['resourceSpans'][0]['scopeSpans'][0]['spans'][0] ?? null;
@@ -156,5 +157,20 @@ it('respects sample rate', function () {
 
     $middleware->handle($request, fn () => new Response('OK', 200));
 
-    expect($tracer->activeSpan())->toBeNull();
+    Http::assertNothingSent();
+});
+
+it('does not flush twice when terminate is also called', function () {
+    $tracer = new OtlpTracer(new OtlpTransport);
+    $this->app->instance(TracerContract::class, $tracer);
+
+    $middleware = new StartRequestTrace($tracer);
+    $request = Request::create('/api/orders', 'GET');
+    $response = new Response('OK', 200);
+
+    $middleware->handle($request, fn () => $response);
+    $middleware->terminate($request, $response);
+
+    // Should only send once (handle flushes, terminate is a no-op)
+    Http::assertSentCount(1);
 });

@@ -56,10 +56,23 @@ class StartRequestTrace
 
         app()->instance(RequestContext::class, $ctx);
 
-        return $next($request);
+        $response = $next($request);
+
+        $this->finalize($response);
+
+        return $response;
     }
 
     public function terminate(Request $request, Response $response): void
+    {
+        // Flush is handled inline in handle() to ensure it runs
+        // even when terminate() is not called (e.g., some FPM setups).
+        // This method is kept for compatibility but is a no-op if
+        // already flushed.
+        $this->finalize($response);
+    }
+
+    private function finalize(Response $response): void
     {
         if ($this->rootSpan === null) {
             return;
@@ -75,6 +88,7 @@ class StartRequestTrace
 
         $this->rootSpan->end();
         $this->tracer->flush();
+        $this->rootSpan = null;
     }
 
     private function isExcluded(Request $request): bool
