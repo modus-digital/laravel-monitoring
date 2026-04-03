@@ -28,6 +28,8 @@ return [
         'enabled' => env('MONITORING_METRICS_ENABLED', true),
     ],
 
+    // Routes to exclude from tracing. Matches against both route names and URL paths.
+    // Example: ['health', 'horizon'] excludes /health and any route named "horizon.*"
     'middleware' => [
         'exclude' => [],
     ],
