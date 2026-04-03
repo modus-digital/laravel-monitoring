@@ -2,6 +2,14 @@
 
 All notable changes to `laravel-monitoring` will be documented in this file.
 
+## v1.2.0 - OTEL Update - 2026-04-03
+
+### What's Changed
+
+* refactor: OTLP-first observability — traces, logs, metrics via Grafana Alloy by @AlexVanSteenhoven in https://github.com/modus-digital/laravel-monitoring/pull/4
+
+**Full Changelog**: https://github.com/modus-digital/laravel-monitoring/compare/1.1.0...1.2.0
+
 ## 1.1.0 - 2026-04-02
 
 ### What's Changed
