@@ -3,6 +3,7 @@
 namespace ModusDigital\LaravelMonitoring;
 
 use Illuminate\Support\ServiceProvider;
+use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 
 class MonitoringServiceProvider extends ServiceProvider
 {
@@ -12,6 +13,8 @@ class MonitoringServiceProvider extends ServiceProvider
             __DIR__.'/../config/monitoring.php',
             'monitoring'
         );
+
+        $this->app->singleton(MetricRegistry::class);
     }
 
     public function boot(): void
