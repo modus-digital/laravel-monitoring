@@ -4,36 +4,30 @@ namespace ModusDigital\LaravelMonitoring\Metrics;
 
 class Counter extends Metric
 {
-    public function getType(): string
-    {
-        return 'counter';
-    }
+    private float $value = 0.0;
 
     public function increment(): void
     {
-        $this->incrementBy(1);
+        $this->value += 1.0;
     }
 
     public function incrementBy(float $value): void
     {
-        $key = $this->cacheKey();
-
-        // add() is atomic — only sets if key does not exist
-        $this->cache()->add($key, 0, $this->ttl());
-
-        // Store as integer (value * 100) for Cache::increment() atomicity
-        $this->cache()->increment($key, (int) round($value * 100));
+        $this->value += $value;
     }
 
     public function getValue(): float
     {
-        $raw = (int) ($this->cache()->get($this->cacheKey()) ?? 0);
-
-        return $raw / 100;
+        return $this->value;
     }
 
     public function reset(): void
     {
-        $this->cache()->forget($this->cacheKey());
+        $this->value = 0.0;
+    }
+
+    public function getType(): string
+    {
+        return 'counter';
     }
 }

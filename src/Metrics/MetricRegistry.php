@@ -43,7 +43,7 @@ class MetricRegistry
 
     /**
      * @param  array<string, string>  $labels
-     * @param  array<int>|null  $buckets
+     * @param  list<int>|null  $buckets
      */
     public function histogram(string $name, array $labels = [], ?array $buckets = null): Histogram
     {
@@ -60,7 +60,7 @@ class MetricRegistry
     }
 
     /**
-     * @return array<array{type: string, name: string, labels: array<string, string>, buckets?: array<int>}>
+     * @return array<array{type: string, name: string, labels: array<string, string>, buckets?: list<int>}>
      */
     public function all(): array
     {
@@ -118,7 +118,7 @@ class MetricRegistry
         $this->cache()->put($regKey, $entry);
     }
 
-    /** @param array{type: string, name: string, labels: array<string, string>, buckets?: array<int>} $entry */
+    /** @param array{type: string, name: string, labels: array<string, string>, buckets?: list<int>} $entry */
     private function reconstruct(array $entry): ?Metric
     {
         return match ($entry['type']) {
@@ -169,14 +169,17 @@ class MetricRegistry
 
     private function instanceKey(Metric $metric): string
     {
-        return "{$metric->getType()}:{$metric->getName()}:{$metric->getLabelsHash()}";
+        $labelsHash = md5(serialize($metric->getLabels()));
+
+        return "{$metric->getType()}:{$metric->getName()}:{$labelsHash}";
     }
 
     private function registrationKey(Metric $metric): string
     {
         $prefix = config('monitoring.cache.key_prefix', 'monitoring');
+        $labelsHash = md5(serialize($metric->getLabels()));
 
-        return "{$prefix}:reg:{$metric->getType()}:{$metric->getName()}:{$metric->getLabelsHash()}";
+        return "{$prefix}:reg:{$metric->getType()}:{$metric->getName()}:{$labelsHash}";
     }
 
     private function indexKey(): string
