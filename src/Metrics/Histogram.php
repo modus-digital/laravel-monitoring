@@ -4,21 +4,66 @@ namespace ModusDigital\LaravelMonitoring\Metrics;
 
 class Histogram extends Metric
 {
-    public const DEFAULT_BUCKETS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+    private const DEFAULT_BUCKETS = [5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
 
-    /** @var array<int> */
-    protected array $buckets;
+    /** @var array<int|string, int> */
+    private array $buckets = [];
+
+    private float $sum = 0.0;
+
+    /** @var list<int> */
+    private array $boundaries;
 
     /**
      * @param  array<string, string>  $labels
-     * @param  array<int>|null  $buckets
+     * @param  list<int>|null  $buckets
      */
     public function __construct(string $name, array $labels = [], ?array $buckets = null)
     {
         parent::__construct($name, $labels);
+        $this->boundaries = $buckets ?? self::DEFAULT_BUCKETS;
+        $this->initBuckets();
+    }
 
-        $this->buckets = $buckets ?? self::DEFAULT_BUCKETS;
-        sort($this->buckets);
+    public function observe(float $value): void
+    {
+        $this->sum += $value;
+
+        foreach ($this->boundaries as $bound) {
+            if ($value <= $bound) {
+                $this->buckets[$bound]++;
+            }
+        }
+
+        $this->buckets['+Inf']++;
+    }
+
+    /** @return array<int|string, int> */
+    public function getBuckets(): array
+    {
+        return $this->buckets;
+    }
+
+    /** @return list<int> */
+    public function getBucketBoundaries(): array
+    {
+        return $this->boundaries;
+    }
+
+    public function getSum(): float
+    {
+        return $this->sum;
+    }
+
+    public function getCount(): int
+    {
+        return $this->buckets['+Inf'];
+    }
+
+    public function reset(): void
+    {
+        $this->sum = 0.0;
+        $this->initBuckets();
     }
 
     public function getType(): string
@@ -26,68 +71,12 @@ class Histogram extends Metric
         return 'histogram';
     }
 
-    public function observe(int|float $value): void
+    private function initBuckets(): void
     {
-        $ttl = $this->ttl();
-
-        foreach ($this->buckets as $bound) {
-            if ($value <= $bound) {
-                $key = $this->cacheKey("bucket:{$bound}");
-                $this->cache()->add($key, 0, $ttl);
-                $this->cache()->increment($key);
-            }
+        $this->buckets = [];
+        foreach ($this->boundaries as $bound) {
+            $this->buckets[$bound] = 0;
         }
-
-        // +Inf always incremented
-        $infKey = $this->cacheKey('bucket:+Inf');
-        $this->cache()->add($infKey, 0, $ttl);
-        $this->cache()->increment($infKey);
-
-        // Sum: store as integer (value * 100) for atomicity, divide on read
-        $sumKey = $this->cacheKey('sum');
-        $this->cache()->add($sumKey, 0, $ttl);
-        $this->cache()->increment($sumKey, (int) round($value * 100));
-    }
-
-    /** @return array<int|string, int> */
-    public function getBuckets(): array
-    {
-        $result = [];
-
-        foreach ($this->buckets as $bound) {
-            $result[$bound] = (int) ($this->cache()->get($this->cacheKey("bucket:{$bound}")) ?? 0);
-        }
-
-        $result['+Inf'] = (int) ($this->cache()->get($this->cacheKey('bucket:+Inf')) ?? 0);
-
-        return $result;
-    }
-
-    public function getSum(): int|float
-    {
-        $raw = (int) ($this->cache()->get($this->cacheKey('sum')) ?? 0);
-
-        return $raw / 100;
-    }
-
-    public function getCount(): int
-    {
-        return (int) ($this->cache()->get($this->cacheKey('bucket:+Inf')) ?? 0);
-    }
-
-    /** @return array<int> */
-    public function getBucketBoundaries(): array
-    {
-        return $this->buckets;
-    }
-
-    public function reset(): void
-    {
-        foreach ($this->buckets as $bound) {
-            $this->cache()->forget($this->cacheKey("bucket:{$bound}"));
-        }
-
-        $this->cache()->forget($this->cacheKey('bucket:+Inf'));
-        $this->cache()->forget($this->cacheKey('sum'));
+        $this->buckets['+Inf'] = 0;
     }
 }

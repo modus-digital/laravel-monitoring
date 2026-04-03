@@ -2,59 +2,60 @@
 
 use ModusDigital\LaravelMonitoring\Metrics\Gauge;
 
-beforeEach(function () {
-    config()->set('monitoring.cache.store', 'array');
-    config()->set('monitoring.cache.key_prefix', 'test_monitoring');
-    config()->set('monitoring.cache.ttl', 3600);
-});
-
 it('starts at zero', function () {
-    $gauge = new Gauge('queue_depth', []);
-    expect($gauge->getValue())->toEqual(0);
+    $gauge = new Gauge('test');
+
+    expect($gauge->getValue())->toBe(0.0);
 });
 
 it('sets an absolute value', function () {
-    $gauge = new Gauge('queue_depth', []);
-    $gauge->set(42);
-    expect($gauge->getValue())->toEqual(42);
+    $gauge = new Gauge('test');
+    $gauge->set(42.5);
+
+    expect($gauge->getValue())->toBe(42.5);
 });
 
-it('increments by 1', function () {
-    $gauge = new Gauge('queue_depth', []);
+it('increments by one', function () {
+    $gauge = new Gauge('test');
     $gauge->set(10);
     $gauge->increment();
-    expect($gauge->getValue())->toEqual(11);
+
+    expect($gauge->getValue())->toBe(11.0);
 });
 
-it('decrements by 1', function () {
-    $gauge = new Gauge('queue_depth', []);
+it('decrements by one', function () {
+    $gauge = new Gauge('test');
     $gauge->set(10);
     $gauge->decrement();
-    expect($gauge->getValue())->toEqual(9);
+
+    expect($gauge->getValue())->toBe(9.0);
 });
 
-it('increments by a custom amount', function () {
-    $gauge = new Gauge('queue_depth', []);
-    $gauge->set(10);
-    $gauge->incrementBy(5);
-    expect($gauge->getValue())->toEqual(15);
+it('increments by a specific amount', function () {
+    $gauge = new Gauge('test');
+    $gauge->incrementBy(3.5);
+
+    expect($gauge->getValue())->toBe(3.5);
 });
 
-it('decrements by a custom amount', function () {
-    $gauge = new Gauge('queue_depth', []);
+it('decrements by a specific amount', function () {
+    $gauge = new Gauge('test');
     $gauge->set(10);
-    $gauge->decrementBy(3);
-    expect($gauge->getValue())->toEqual(7);
+    $gauge->decrementBy(3.5);
+
+    expect($gauge->getValue())->toBe(6.5);
 });
 
 it('resets to zero', function () {
-    $gauge = new Gauge('queue_depth', []);
-    $gauge->set(42);
+    $gauge = new Gauge('test');
+    $gauge->set(100);
     $gauge->reset();
-    expect($gauge->getValue())->toEqual(0);
+
+    expect($gauge->getValue())->toBe(0.0);
 });
 
-it('returns gauge type', function () {
-    $gauge = new Gauge('test', []);
+it('returns type gauge', function () {
+    $gauge = new Gauge('test');
+
     expect($gauge->getType())->toBe('gauge');
 });

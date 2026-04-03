@@ -2,36 +2,21 @@
 
 use ModusDigital\LaravelMonitoring\Metrics\Counter;
 
-beforeEach(function () {
-    config()->set('monitoring.cache.store', 'array');
-    config()->set('monitoring.cache.key_prefix', 'test_monitoring');
-    config()->set('monitoring.cache.ttl', 3600);
+it('stores name and labels', function () {
+    $counter = new Counter('requests_total', ['method' => 'GET']);
+
+    expect($counter->getName())->toBe('requests_total');
+    expect($counter->getLabels())->toBe(['method' => 'GET']);
 });
 
-it('generates consistent cache keys regardless of label order', function () {
-    $a = new Counter('test_metric', ['b' => '2', 'a' => '1']);
-    $b = new Counter('test_metric', ['a' => '1', 'b' => '2']);
+it('sorts labels by key for consistency', function () {
+    $counter = new Counter('test', ['z' => '1', 'a' => '2']);
 
-    $a->increment();
-    $b->increment();
-
-    expect($b->getValue())->toBe(2.0);
+    expect(array_keys($counter->getLabels()))->toBe(['a', 'z']);
 });
 
-it('generates different cache keys for different labels', function () {
-    $a = new Counter('test_metric', ['env' => 'prod']);
-    $b = new Counter('test_metric', ['env' => 'staging']);
+it('returns its metric type', function () {
+    $counter = new Counter('test');
 
-    $a->increment();
-    $b->increment();
-
-    expect($a->getValue())->toBe(1.0);
-    expect($b->getValue())->toBe(1.0);
-});
-
-it('generates a cache key with no labels', function () {
-    $metric = new Counter('simple_metric', []);
-    $metric->increment();
-
-    expect($metric->getValue())->toBe(1.0);
+    expect($counter->getType())->toBe('counter');
 });

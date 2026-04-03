@@ -4,51 +4,45 @@ namespace ModusDigital\LaravelMonitoring\Metrics;
 
 class Gauge extends Metric
 {
-    public function getType(): string
-    {
-        return 'gauge';
-    }
+    private float $value = 0.0;
 
-    public function set(int|float $value): void
+    public function set(float $value): void
     {
-        $this->cache()->put($this->cacheKey(), (int) round($value * 100), $this->ttl());
+        $this->value = $value;
     }
 
     public function increment(): void
     {
-        $this->incrementBy(1);
-    }
-
-    public function decrement(): void
-    {
-        $this->decrementBy(1);
+        $this->value += 1.0;
     }
 
     public function incrementBy(float $value): void
     {
-        $key = $this->cacheKey();
+        $this->value += $value;
+    }
 
-        $this->cache()->add($key, 0, $this->ttl());
-        $this->cache()->increment($key, (int) round($value * 100));
+    public function decrement(): void
+    {
+        $this->value -= 1.0;
     }
 
     public function decrementBy(float $value): void
     {
-        $key = $this->cacheKey();
-
-        $this->cache()->add($key, 0, $this->ttl());
-        $this->cache()->decrement($key, (int) round($value * 100));
+        $this->value -= $value;
     }
 
     public function getValue(): float
     {
-        $raw = $this->cache()->get($this->cacheKey()) ?? 0;
-
-        return $raw / 100;
+        return $this->value;
     }
 
     public function reset(): void
     {
-        $this->cache()->forget($this->cacheKey());
+        $this->value = 0.0;
+    }
+
+    public function getType(): string
+    {
+        return 'gauge';
     }
 }

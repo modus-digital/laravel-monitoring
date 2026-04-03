@@ -1,54 +1,36 @@
 <?php
 
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Prometheus Pushgateway
-    |--------------------------------------------------------------------------
-    */
-    'pushgateway' => [
-        'enabled' => env('MONITORING_ENABLED', true),
-        'url' => env('PROMETHEUS_PUSHGATEWAY_URL', '127.0.0.1:9091'),
-        'auth' => env('PROMETHEUS_PUSHGATEWAY_AUTH', ''),
-        'job_name' => env('MONITORING_JOB_NAME', null), // null = config('app.name')
-        'schedule' => env('MONITORING_PUSH_SCHEDULE', 'everyMinute'), // Schedule method name, or null to disable
+    'enabled' => env('MONITORING_ENABLED', true),
+
+    'service' => [
+        'name' => env('MONITORING_SERVICE_NAME'),
+        'environment' => env('MONITORING_ENVIRONMENT'),
+        'instance_id' => env('MONITORING_SERVICE_INSTANCE_ID'),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Loki Log Shipping
-    |--------------------------------------------------------------------------
-    */
-    'loki' => [
-        'enabled' => env('LOKI_ENABLED', true),
-        'url' => env('LOKI_ENTRYPOINT'),
-        'auth' => env('LOKI_AUTH'),
-        'level' => env('LOG_LEVEL', 'debug'),
-
-        'labels' => [
-            'app' => env('APP_NAME', 'laravel'),
-            'env' => env('APP_ENV', 'production'),
-        ],
+    'otlp' => [
+        'endpoint' => env('MONITORING_OTLP_ENDPOINT', 'http://127.0.0.1:4318'),
+        'headers' => env('MONITORING_OTLP_HEADERS'),
+        'timeout' => env('MONITORING_OTLP_TIMEOUT', 3),
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | HTTP Metrics Middleware
-    |--------------------------------------------------------------------------
-    */
+    'traces' => [
+        'enabled' => env('MONITORING_TRACES_ENABLED', true),
+        'sample_rate' => env('MONITORING_TRACE_SAMPLE_RATE', 1.0),
+    ],
+
+    'logs' => [
+        'enabled' => env('MONITORING_LOGS_ENABLED', true),
+    ],
+
+    'metrics' => [
+        'enabled' => env('MONITORING_METRICS_ENABLED', true),
+    ],
+
+    // Routes to exclude from tracing. Matches against both route names and URL paths.
+    // Example: ['health', 'horizon'] excludes /health and any route named "horizon.*"
     'middleware' => [
         'exclude' => [],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Cache
-    |--------------------------------------------------------------------------
-    | The cache store used to buffer metrics between pushes.
-    */
-    'cache' => [
-        'store' => env('MONITORING_CACHE_STORE', null), // null = app's default cache store
-        'key_prefix' => env('MONITORING_CACHE_PREFIX', 'monitoring'),
-        'ttl' => 3600,
     ],
 ];

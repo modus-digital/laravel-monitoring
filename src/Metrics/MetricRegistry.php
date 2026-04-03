@@ -2,194 +2,71 @@
 
 namespace ModusDigital\LaravelMonitoring\Metrics;
 
-use Illuminate\Contracts\Cache\LockProvider;
-use Illuminate\Contracts\Cache\Repository;
-use Illuminate\Support\Facades\Cache;
-
 class MetricRegistry
 {
-    /** @var array<string, Metric> In-memory cache of metric instances for this request */
-    private array $instances = [];
+    /** @var array<string, Metric> */
+    private array $metrics = [];
 
     /** @param array<string, string> $labels */
     public function counter(string $name, array $labels = []): Counter
     {
-        $counter = new Counter($name, $labels);
-        $key = $this->instanceKey($counter);
+        $key = $this->key('counter', $name, $labels);
 
-        if (! isset($this->instances[$key])) {
-            $this->instances[$key] = $counter;
-            $this->register($counter);
+        if (! isset($this->metrics[$key])) {
+            $this->metrics[$key] = new Counter($name, $labels);
         }
 
         /** @var Counter */
-        return $this->instances[$key];
+        return $this->metrics[$key];
     }
 
     /** @param array<string, string> $labels */
     public function gauge(string $name, array $labels = []): Gauge
     {
-        $gauge = new Gauge($name, $labels);
-        $key = $this->instanceKey($gauge);
+        $key = $this->key('gauge', $name, $labels);
 
-        if (! isset($this->instances[$key])) {
-            $this->instances[$key] = $gauge;
-            $this->register($gauge);
+        if (! isset($this->metrics[$key])) {
+            $this->metrics[$key] = new Gauge($name, $labels);
         }
 
         /** @var Gauge */
-        return $this->instances[$key];
+        return $this->metrics[$key];
     }
 
     /**
      * @param  array<string, string>  $labels
-     * @param  array<int>|null  $buckets
+     * @param  list<int>|null  $buckets
      */
     public function histogram(string $name, array $labels = [], ?array $buckets = null): Histogram
     {
-        $histogram = new Histogram($name, $labels, $buckets);
-        $key = $this->instanceKey($histogram);
+        $key = $this->key('histogram', $name, $labels);
 
-        if (! isset($this->instances[$key])) {
-            $this->instances[$key] = $histogram;
-            $this->register($histogram);
+        if (! isset($this->metrics[$key])) {
+            $this->metrics[$key] = new Histogram($name, $labels, $buckets);
         }
 
         /** @var Histogram */
-        return $this->instances[$key];
+        return $this->metrics[$key];
     }
 
-    /**
-     * @return array<array{type: string, name: string, labels: array<string, string>, buckets?: array<int>}>
-     */
+    /** @return list<Metric> */
     public function all(): array
     {
-        $index = $this->cache()->get($this->indexKey()) ?? [];
-        $entries = [];
-
-        foreach ($index as $regKey) {
-            $entry = $this->cache()->get($regKey);
-            if ($entry !== null) {
-                $entries[] = $entry;
-            }
-        }
-
-        return $entries;
+        return array_values($this->metrics);
     }
 
-    public function cleanStale(): void
+    public function reset(): void
     {
-        $index = $this->cache()->get($this->indexKey()) ?? [];
-        $cleaned = [];
-
-        foreach ($index as $regKey) {
-            $entry = $this->cache()->get($regKey);
-            if ($entry === null) {
-                continue;
-            }
-
-            $metric = $this->reconstruct($entry);
-
-            if ($metric !== null && $this->hasData($metric)) {
-                $cleaned[] = $regKey;
-            } else {
-                $this->cache()->forget($regKey);
-            }
-        }
-
-        $this->cache()->put($this->indexKey(), $cleaned);
-    }
-
-    private function register(Metric $metric): void
-    {
-        $regKey = $this->registrationKey($metric);
-
-        $entry = [
-            'type' => $metric->getType(),
-            'name' => $metric->getName(),
-            'labels' => $metric->getLabels(),
-        ];
-
-        if ($metric instanceof Histogram) {
-            $entry['buckets'] = $metric->getBucketBoundaries();
-        }
-
-        $this->updateIndex($regKey);
-        $this->cache()->put($regKey, $entry);
-    }
-
-    /** @param array{type: string, name: string, labels: array<string, string>, buckets?: array<int>} $entry */
-    private function reconstruct(array $entry): ?Metric
-    {
-        return match ($entry['type']) {
-            'counter' => new Counter($entry['name'], $entry['labels']),
-            'gauge' => new Gauge($entry['name'], $entry['labels']),
-            'histogram' => new Histogram($entry['name'], $entry['labels'], $entry['buckets'] ?? null),
-            default => null,
-        };
-    }
-
-    private function hasData(Metric $metric): bool
-    {
-        return match (true) {
-            $metric instanceof Counter => $metric->getValue() > 0,
-            $metric instanceof Gauge => true, // Gauges represent current state — never stale
-            $metric instanceof Histogram => $metric->getCount() > 0,
-            default => false,
-        };
-    }
-
-    private function updateIndex(string $regKey): void
-    {
-        $callback = function () use ($regKey) {
-            $index = $this->cache()->get($this->indexKey()) ?? [];
-
-            if (! in_array($regKey, $index, true)) {
-                $index[] = $regKey;
-                $this->cache()->put($this->indexKey(), $index);
-            }
-        };
-
-        try {
-            $store = $this->cache()->getStore();
-
-            if ($store instanceof LockProvider) {
-                $acquired = $store->lock($this->indexKey().':lock', 5)->get($callback);
-
-                if (! $acquired) {
-                    $callback();
-                }
-            } else {
-                $callback();
-            }
-        } catch (\Throwable) {
-            $callback();
+        foreach ($this->metrics as $metric) {
+            $metric->reset();
         }
     }
 
-    private function instanceKey(Metric $metric): string
+    /** @param array<string, string> $labels */
+    private function key(string $type, string $name, array $labels): string
     {
-        return "{$metric->getType()}:{$metric->getName()}:{$metric->getLabelsHash()}";
-    }
+        ksort($labels);
 
-    private function registrationKey(Metric $metric): string
-    {
-        $prefix = config('monitoring.cache.key_prefix', 'monitoring');
-
-        return "{$prefix}:reg:{$metric->getType()}:{$metric->getName()}:{$metric->getLabelsHash()}";
-    }
-
-    private function indexKey(): string
-    {
-        $prefix = config('monitoring.cache.key_prefix', 'monitoring');
-
-        return "{$prefix}:registry_index";
-    }
-
-    private function cache(): Repository
-    {
-        $store = config('monitoring.cache.store');
-
-        return Cache::store($store);
+        return $type.':'.$name.':'.md5(serialize($labels));
     }
 }

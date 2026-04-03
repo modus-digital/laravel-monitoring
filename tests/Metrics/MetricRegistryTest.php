@@ -1,79 +1,71 @@
 <?php
 
-use ModusDigital\LaravelMonitoring\Facades\Monitoring;
 use ModusDigital\LaravelMonitoring\Metrics\Counter;
 use ModusDigital\LaravelMonitoring\Metrics\Gauge;
 use ModusDigital\LaravelMonitoring\Metrics\Histogram;
 use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 
-beforeEach(function () {
-    config()->set('monitoring.cache.store', 'array');
-    config()->set('monitoring.cache.key_prefix', 'test_monitoring');
-    config()->set('monitoring.cache.ttl', 3600);
-});
-
-it('creates a counter and registers it', function () {
+it('creates a counter', function () {
     $registry = new MetricRegistry;
-    $counter = $registry->counter('requests_total', ['method' => 'GET']);
+    $counter = $registry->counter('test_counter');
+
     expect($counter)->toBeInstanceOf(Counter::class);
-    expect($counter->getName())->toBe('requests_total');
-    expect($counter->getLabels())->toBe(['method' => 'GET']);
+    expect($counter->getName())->toBe('test_counter');
 });
 
-it('creates a gauge and registers it', function () {
+it('creates a gauge', function () {
     $registry = new MetricRegistry;
-    $gauge = $registry->gauge('queue_depth', ['queue' => 'emails']);
+    $gauge = $registry->gauge('test_gauge');
+
     expect($gauge)->toBeInstanceOf(Gauge::class);
 });
 
-it('creates a histogram and registers it', function () {
+it('creates a histogram', function () {
     $registry = new MetricRegistry;
-    $histogram = $registry->histogram('duration_ms', ['route' => '/api'], [10, 50, 100]);
+    $histogram = $registry->histogram('test_histogram');
+
     expect($histogram)->toBeInstanceOf(Histogram::class);
 });
 
-it('returns the same counter for the same name and labels', function () {
+it('returns same instance for same name and labels', function () {
     $registry = new MetricRegistry;
-    $a = $registry->counter('requests_total', ['method' => 'GET']);
-    $b = $registry->counter('requests_total', ['method' => 'GET']);
-    $a->increment();
-    expect($b->getValue())->toBe(1.0);
+    $a = $registry->counter('test', ['method' => 'GET']);
+    $b = $registry->counter('test', ['method' => 'GET']);
+
+    expect($a)->toBe($b);
 });
 
-it('lists all registered metrics', function () {
+it('returns different instances for different labels', function () {
     $registry = new MetricRegistry;
-    $registry->counter('requests_total', ['method' => 'GET']);
-    $registry->gauge('queue_depth', []);
-    $registry->histogram('duration_ms', [], [10, 50]);
+    $a = $registry->counter('test', ['method' => 'GET']);
+    $b = $registry->counter('test', ['method' => 'POST']);
+
+    expect($a)->not->toBe($b);
+});
+
+it('returns all registered metrics', function () {
+    $registry = new MetricRegistry;
+    $registry->counter('counter_a');
+    $registry->gauge('gauge_a');
+    $registry->histogram('hist_a');
+
     $all = $registry->all();
+
     expect($all)->toHaveCount(3);
 });
 
-it('does not duplicate registry entries for same metric', function () {
+it('resets all metrics', function () {
     $registry = new MetricRegistry;
-    $registry->counter('requests_total', ['method' => 'GET']);
-    $registry->counter('requests_total', ['method' => 'GET']);
-    $registry->counter('requests_total', ['method' => 'GET']);
-    $all = $registry->all();
-    expect($all)->toHaveCount(1);
-});
+    $counter = $registry->counter('test');
+    $counter->incrementBy(10);
 
-it('cleans stale entries from the registry', function () {
-    $registry = new MetricRegistry;
-    $counter = $registry->counter('stale_metric', []);
-    $counter->increment();
-    $counter->reset();
-    $registry->cleanStale();
-    $all = $registry->all();
-    expect($all)->toHaveCount(0);
+    $registry->reset();
+
+    expect($counter->getValue())->toBe(0.0);
 });
 
 it('resolves via the monitoring() helper', function () {
-    expect(monitoring())->toBeInstanceOf(MetricRegistry::class);
-});
+    $registry = app(MetricRegistry::class);
 
-it('creates a counter via the Monitoring facade', function () {
-    $counter = Monitoring::counter('facade_test', []);
-    $counter->increment();
-    expect($counter->getValue())->toEqual(1);
+    expect(monitoring())->toBe($registry);
 });
