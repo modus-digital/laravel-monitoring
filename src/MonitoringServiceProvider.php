@@ -71,27 +71,33 @@ class MonitoringServiceProvider extends ServiceProvider
             'processors' => [MonitoringLogProcessor::class],
         ]);
 
-        // Auto-flush metrics on queue job completion
-        if (config('monitoring.enabled') && config('monitoring.metrics.enabled')) {
+        // Auto-flush telemetry on queue job completion
+        if (config('monitoring.enabled')) {
             Queue::after(function () {
-                $this->flushMetrics();
+                $this->flushTelemetry();
             });
 
             Queue::failing(function () {
-                $this->flushMetrics();
+                $this->flushTelemetry();
             });
         }
     }
 
-    private function flushMetrics(): void
+    private function flushTelemetry(): void
     {
-        $registry = $this->app->make(MetricRegistry::class);
-        $exporter = $this->app->make(MetricExporterContract::class);
+        if (config('monitoring.traces.enabled')) {
+            $this->app->make(TracerContract::class)->flush();
+        }
 
-        $metrics = $registry->all();
-        if ($metrics !== []) {
-            $exporter->export($metrics);
-            $registry->reset();
+        if (config('monitoring.metrics.enabled')) {
+            $registry = $this->app->make(MetricRegistry::class);
+            $exporter = $this->app->make(MetricExporterContract::class);
+
+            $metrics = $registry->all();
+            if ($metrics !== []) {
+                $exporter->export($metrics);
+                $registry->reset();
+            }
         }
     }
 }

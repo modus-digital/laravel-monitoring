@@ -4,7 +4,6 @@ namespace ModusDigital\LaravelMonitoring\Otlp;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 class OtlpTransport
 {
@@ -25,8 +24,8 @@ class OtlpTransport
         } catch (ConnectionException) {
             // Fire and forget — telemetry loss is acceptable
         } catch (\Throwable $e) {
-            // Log transport errors but don't crash the app
-            Log::debug('OTLP transport error: '.$e->getMessage());
+            // Use error_log to avoid recursive logging if monitoring is the default log channel
+            error_log('OTLP transport error: '.$e->getMessage());
         }
     }
 

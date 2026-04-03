@@ -97,12 +97,12 @@ class StartRequestTrace
 
     private function shouldSample(Request $request): bool
     {
-        // Respect upstream sampling decision
+        // Respect upstream sampling decision from traceparent header
         $traceparent = $this->getTraceparentHeader($request);
         if ($traceparent !== null) {
             $parts = explode('-', $traceparent);
-            if (isset($parts[3]) && ((int) hexdec($parts[3]) & 0x01)) {
-                return true;
+            if (isset($parts[3])) {
+                return (bool) ((int) hexdec($parts[3]) & 0x01);
             }
         }
 

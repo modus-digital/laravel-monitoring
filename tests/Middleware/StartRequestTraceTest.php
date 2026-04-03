@@ -97,6 +97,21 @@ it('continues trace from incoming traceparent header', function () {
     expect($span->parentSpanId)->toBe($parentSpanId);
 });
 
+it('respects upstream sampled=0 flag', function () {
+    $tracer = new OtlpTracer(new OtlpTransport);
+    $this->app->instance(TracerContract::class, $tracer);
+
+    $middleware = new StartRequestTrace($tracer);
+    $traceId = str_repeat('ab', 16);
+    $parentSpanId = str_repeat('cd', 8);
+    $request = Request::create('/api/orders', 'GET');
+    $request->headers->set('traceparent', "00-{$traceId}-{$parentSpanId}-00");
+
+    $middleware->handle($request, fn () => new Response('OK', 200));
+
+    expect($tracer->activeSpan())->toBeNull();
+});
+
 it('skips excluded routes', function () {
     config()->set('monitoring.middleware.exclude', ['health']);
 
