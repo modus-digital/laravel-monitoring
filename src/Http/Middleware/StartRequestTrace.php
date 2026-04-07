@@ -5,7 +5,9 @@ namespace ModusDigital\LaravelMonitoring\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use ModusDigital\LaravelMonitoring\Context\RequestContext;
+use ModusDigital\LaravelMonitoring\Contracts\MetricExporterContract;
 use ModusDigital\LaravelMonitoring\Contracts\TracerContract;
+use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
 use ModusDigital\LaravelMonitoring\Tracing\Span;
 use ModusDigital\LaravelMonitoring\Tracing\SpanKind;
 use ModusDigital\LaravelMonitoring\Tracing\SpanStatus;
@@ -17,78 +19,107 @@ class StartRequestTrace
 
     private bool $sampled = true;
 
+    private bool $finalized = false;
+
+    private int $startTime = 0;
+
     public function __construct(
         private readonly TracerContract $tracer,
+        private readonly MetricRegistry $registry,
+        private readonly MetricExporterContract $exporter,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
+        $this->startTime = hrtime(true);
+
         if ($this->isExcluded($request)) {
             return $next($request);
         }
 
         $this->sampled = $this->shouldSample($request);
 
-        if (! $this->sampled) {
-            return $next($request);
+        if ($this->sampled) {
+            $traceparent = $this->parseTraceparent($this->getTraceparentHeader($request));
+
+            $this->rootSpan = $this->tracer->startSpan(
+                name: 'http.request',
+                attributes: [
+                    'http.method' => $request->method(),
+                    'http.route' => $request->route()?->getName() ?? $request->path(),
+                ],
+                kind: SpanKind::SERVER,
+                traceId: $traceparent['traceId'] ?? null,
+                parentSpanId: $traceparent['parentSpanId'] ?? null,
+            );
+
+            $ctx = new RequestContext(
+                traceId: $this->rootSpan->traceId,
+                spanId: $this->rootSpan->spanId,
+                requestId: $this->getRequestId($request),
+            );
+            $ctx->route = $request->route()?->getName() ?? $request->path();
+            $ctx->method = $request->method();
+
+            app()->instance(RequestContext::class, $ctx);
         }
-
-        $traceparent = $this->parseTraceparent($this->getTraceparentHeader($request));
-
-        $this->rootSpan = $this->tracer->startSpan(
-            name: 'http.request',
-            attributes: [
-                'http.method' => $request->method(),
-                'http.route' => $request->route()?->getName() ?? $request->path(),
-            ],
-            kind: SpanKind::SERVER,
-            traceId: $traceparent['traceId'] ?? null,
-            parentSpanId: $traceparent['parentSpanId'] ?? null,
-        );
-
-        $ctx = new RequestContext(
-            traceId: $this->rootSpan->traceId,
-            spanId: $this->rootSpan->spanId,
-            requestId: $this->getRequestId($request),
-        );
-        $ctx->route = $request->route()?->getName() ?? $request->path();
-        $ctx->method = $request->method();
-
-        app()->instance(RequestContext::class, $ctx);
 
         $response = $next($request);
 
-        $this->finalize($response);
+        $this->finalize($request, $response);
 
         return $response;
     }
 
     public function terminate(Request $request, Response $response): void
     {
-        // Flush is handled inline in handle() to ensure it runs
-        // even when terminate() is not called (e.g., some FPM setups).
-        // This method is kept for compatibility but is a no-op if
-        // already flushed.
-        $this->finalize($response);
+        $this->finalize($request, $response);
     }
 
-    private function finalize(Response $response): void
+    private function finalize(Request $request, Response $response): void
     {
-        if ($this->rootSpan === null) {
+        if ($this->finalized) {
             return;
         }
 
-        $statusCode = $response->getStatusCode();
-        $this->rootSpan->setAttribute('http.status_code', $statusCode);
-        $this->rootSpan->setAttribute('http.status_group', intdiv($statusCode, 100).'xx');
+        $this->finalized = true;
 
-        if ($statusCode >= 500) {
-            $this->rootSpan->setStatus(SpanStatus::ERROR);
+        $statusCode = $response->getStatusCode();
+
+        // Always record metrics (even when unsampled)
+        $route = $request->route()?->getName() ?? $request->path();
+        $durationMs = (hrtime(true) - $this->startTime) / 1_000_000;
+
+        $this->registry->counter('http_requests_total', [
+            'method' => $request->method(),
+            'route' => $route,
+            'status_group' => intdiv($statusCode, 100).'xx',
+        ])->increment();
+
+        $this->registry->histogram('http_request_duration_ms', [
+            'method' => $request->method(),
+            'route' => $route,
+        ])->observe($durationMs);
+
+        // Only record span data if sampling was active
+        if ($this->rootSpan !== null) {
+            $this->rootSpan->setAttribute('http.status_code', $statusCode);
+            $this->rootSpan->setAttribute('http.status_group', intdiv($statusCode, 100).'xx');
+
+            if ($statusCode >= 500) {
+                $this->rootSpan->setStatus(SpanStatus::ERROR);
+            }
+
+            $this->rootSpan->end();
+            $this->tracer->flush();
         }
 
-        $this->rootSpan->end();
-        $this->tracer->flush();
-        $this->rootSpan = null;
+        // Flush metrics inline
+        $metrics = $this->registry->all();
+        if ($metrics !== []) {
+            $this->exporter->export($metrics);
+            $this->registry->reset();
+        }
     }
 
     private function isExcluded(Request $request): bool
@@ -111,7 +142,6 @@ class StartRequestTrace
 
     private function shouldSample(Request $request): bool
     {
-        // Respect upstream sampling decision from traceparent header
         $traceparent = $this->getTraceparentHeader($request);
         if ($traceparent !== null) {
             $parts = explode('-', $traceparent);
