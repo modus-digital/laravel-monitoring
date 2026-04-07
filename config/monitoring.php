@@ -33,4 +33,11 @@ return [
     'middleware' => [
         'exclude' => [],
     ],
+
+    'auto_instrumentation' => [
+        'db' => env('MONITORING_INSTRUMENT_DB', true),
+        'http_client' => env('MONITORING_INSTRUMENT_HTTP_CLIENT', true),
+        'cache' => env('MONITORING_INSTRUMENT_CACHE', true),
+        'queue' => env('MONITORING_INSTRUMENT_QUEUE', true),
+    ],
 ];
