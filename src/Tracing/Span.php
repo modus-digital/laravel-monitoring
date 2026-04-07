@@ -34,6 +34,7 @@ class Span
         ?string $parentSpanId = null,
         int $traceFlags = 1,
         SpanKind $kind = SpanKind::INTERNAL,
+        ?int $startTimeNano = null,
     ) {
         $this->name = $name;
         $this->traceId = $traceId ?? bin2hex(random_bytes(16));
@@ -41,7 +42,7 @@ class Span
         $this->parentSpanId = $parentSpanId;
         $this->traceFlags = $traceFlags;
         $this->kind = $kind;
-        $this->startTimeNano = self::nowUnixNano();
+        $this->startTimeNano = $startTimeNano ?? self::nowUnixNano();
     }
 
     public function setAttribute(string $key, mixed $value): self

@@ -22,6 +22,7 @@ class OtlpTracer implements TracerContract
         SpanKind $kind = SpanKind::INTERNAL,
         ?string $traceId = null,
         ?string $parentSpanId = null,
+        ?int $startTimeNano = null,
     ): Span {
         $activeSpan = $this->activeSpan();
 
@@ -30,6 +31,7 @@ class OtlpTracer implements TracerContract
             traceId: $traceId ?? $activeSpan?->traceId,
             parentSpanId: $parentSpanId ?? $activeSpan?->spanId,
             kind: $kind,
+            startTimeNano: $startTimeNano,
         );
 
         foreach ($attributes as $key => $value) {

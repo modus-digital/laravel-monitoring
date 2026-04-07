@@ -103,6 +103,13 @@ it('creates child spans with same trace ID', function () {
     expect($child->kind)->toBe(SpanKind::INTERNAL);
 });
 
+it('accepts a custom startTimeNano for backdating', function () {
+    $customStart = 1_700_000_000_000_000_000;
+    $span = new Span('test.span', startTimeNano: $customStart);
+
+    expect($span->startTimeNano)->toBe($customStart);
+});
+
 it('serializes to OTLP-compatible array', function () {
     $span = new Span('http.request', kind: SpanKind::SERVER);
     $span->setAttribute('http.method', 'GET');

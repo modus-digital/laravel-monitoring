@@ -14,6 +14,7 @@ interface TracerContract
         SpanKind $kind = SpanKind::INTERNAL,
         ?string $traceId = null,
         ?string $parentSpanId = null,
+        ?int $startTimeNano = null,
     ): Span;
 
     public function activeSpan(): ?Span;

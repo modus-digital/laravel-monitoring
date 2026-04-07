@@ -15,8 +15,9 @@ class NullTracer implements TracerContract
         SpanKind $kind = SpanKind::INTERNAL,
         ?string $traceId = null,
         ?string $parentSpanId = null,
+        ?int $startTimeNano = null,
     ): Span {
-        return new Span($name, kind: $kind);
+        return new Span($name, kind: $kind, startTimeNano: $startTimeNano);
     }
 
     public function activeSpan(): ?Span
