@@ -2,11 +2,26 @@
 
 namespace ModusDigital\LaravelMonitoring;
 
+use Illuminate\Cache\Events\CacheHit;
+use Illuminate\Cache\Events\CacheMissed;
+use Illuminate\Cache\Events\KeyForgotten;
+use Illuminate\Cache\Events\KeyWritten;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Http\Client\Events\RequestSending;
+use Illuminate\Http\Client\Events\ResponseReceived;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 use ModusDigital\LaravelMonitoring\Contracts\LogExporterContract;
 use ModusDigital\LaravelMonitoring\Contracts\MetricExporterContract;
 use ModusDigital\LaravelMonitoring\Contracts\TracerContract;
+use ModusDigital\LaravelMonitoring\Listeners\TraceCacheOperations;
+use ModusDigital\LaravelMonitoring\Listeners\TraceDbQueries;
+use ModusDigital\LaravelMonitoring\Listeners\TraceHttpClient;
+use ModusDigital\LaravelMonitoring\Listeners\TraceQueueJobs;
 use ModusDigital\LaravelMonitoring\Logging\MonitoringLogProcessor;
 use ModusDigital\LaravelMonitoring\Logging\OtlpLogHandler;
 use ModusDigital\LaravelMonitoring\Metrics\MetricRegistry;
@@ -80,6 +95,45 @@ class MonitoringServiceProvider extends ServiceProvider
             Queue::failing(function () {
                 $this->flushTelemetry();
             });
+        }
+
+        $this->registerAutoInstrumentation();
+    }
+
+    private function registerAutoInstrumentation(): void
+    {
+        if (! config('monitoring.enabled') || ! config('monitoring.traces.enabled')) {
+            return;
+        }
+
+        if (config('monitoring.auto_instrumentation.db', true)) {
+            $dbListener = $this->app->make(TraceDbQueries::class);
+            Event::listen(QueryExecuted::class, fn (QueryExecuted $event) => $dbListener->handle($event));
+        }
+
+        if (config('monitoring.auto_instrumentation.http_client', true)) {
+            $httpClient = $this->app->make(TraceHttpClient::class);
+            Event::listen(RequestSending::class, function (RequestSending $event) use ($httpClient) {
+                $httpClient->handleRequestSending($event);
+            });
+            Event::listen(ResponseReceived::class, function (ResponseReceived $event) use ($httpClient) {
+                $httpClient->handleResponseReceived($event);
+            });
+        }
+
+        if (config('monitoring.auto_instrumentation.cache', true)) {
+            $cacheListener = $this->app->make(TraceCacheOperations::class);
+            Event::listen(CacheHit::class, fn (CacheHit $e) => $cacheListener->handleCacheHit($e));
+            Event::listen(CacheMissed::class, fn (CacheMissed $e) => $cacheListener->handleCacheMissed($e));
+            Event::listen(KeyWritten::class, fn (KeyWritten $e) => $cacheListener->handleKeyWritten($e));
+            Event::listen(KeyForgotten::class, fn (KeyForgotten $e) => $cacheListener->handleKeyForgotten($e));
+        }
+
+        if (config('monitoring.auto_instrumentation.queue', true)) {
+            $queueListener = $this->app->make(TraceQueueJobs::class);
+            Event::listen(JobProcessing::class, fn (JobProcessing $e) => $queueListener->handleJobProcessing($e));
+            Event::listen(JobProcessed::class, fn (JobProcessed $e) => $queueListener->handleJobProcessed($e));
+            Event::listen(JobFailed::class, fn (JobFailed $e) => $queueListener->handleJobFailed($e));
         }
     }
 
