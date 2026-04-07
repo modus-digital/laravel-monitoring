@@ -8,8 +8,11 @@
 OTLP-first observability for Laravel — traces, logs, and metrics via Grafana Alloy.
 
 - Distributed tracing with W3C `traceparent` propagation
+- Auto-instrumentation for DB queries, HTTP client, cache, and queue jobs
+- HTTP request metrics (counter + histogram) for Grafana dashboards
 - OTLP log shipping as a native Laravel log channel
 - Custom counters, gauges, and histograms
+- Exception reporting on active spans
 - All telemetry exported as OTLP/JSON to Grafana Alloy (or any OTLP-compatible collector)
 - No scheduler, no cron — everything flushes per-request automatically
 
@@ -78,6 +81,14 @@ return [
     'middleware' => [
         'exclude' => [],
     ],
+
+    // Auto-instrumentation creates child spans for these operations.
+    'auto_instrumentation' => [
+        'db'          => env('MONITORING_INSTRUMENT_DB', true),
+        'http_client' => env('MONITORING_INSTRUMENT_HTTP_CLIENT', true),
+        'cache'       => env('MONITORING_INSTRUMENT_CACHE', true),
+        'queue'       => env('MONITORING_INSTRUMENT_QUEUE', true),
+    ],
 ];
 ```
 
@@ -94,12 +105,13 @@ Register the `StartRequestTrace` middleware to automatically trace HTTP requests
 
 This middleware:
 - Creates a root span for each HTTP request with `SERVER` kind
+- Records `http_requests_total` counter and `http_request_duration_ms` histogram (even when tracing is unsampled)
 - Parses incoming `traceparent` headers for distributed trace propagation
 - Records `http.method`, `http.route`, `http.status_code`, and `http.status_group` attributes
 - Sets `ERROR` status on 5xx responses
 - Populates a `RequestContext` singleton for log correlation
 - Respects the `traces.sample_rate` config and upstream sampling decisions
-- Flushes all telemetry on `terminate()` (after the response is sent)
+- Flushes all telemetry inline (after the response is sent)
 
 ## Usage
 
@@ -125,6 +137,47 @@ try {
     $span->end();
 }
 ```
+
+### Auto-Instrumentation
+
+The package automatically creates child spans for common Laravel operations. Each can be toggled via config or env vars.
+
+**Database queries** — `db.query` spans with SQL, driver, duration, and connection name:
+```env
+MONITORING_INSTRUMENT_DB=true
+```
+
+**HTTP client calls** — `http.client` spans with method, URL, and status code. Sets `ERROR` status on 5xx responses:
+```env
+MONITORING_INSTRUMENT_HTTP_CLIENT=true
+```
+
+**Cache operations** — `cache.hit`, `cache.miss`, `cache.write`, `cache.forget` spans with key and store:
+```env
+MONITORING_INSTRUMENT_CACHE=true
+```
+
+**Queue jobs** — `queue.job` spans with job class, queue, connection, and attempt. Records exception events on failure:
+```env
+MONITORING_INSTRUMENT_QUEUE=true
+```
+
+All auto-instrumentation requires an active parent span (created by the middleware). When a request is unsampled, listeners are no-ops.
+
+### Exception Handling
+
+Report exceptions on the active trace span using the `Monitoring` facade:
+
+```php
+// bootstrap/app.php
+->withExceptions(function (Exceptions $exceptions) {
+    $exceptions->reportable(function (Throwable $e) {
+        \ModusDigital\LaravelMonitoring\Facades\Monitoring::reportException($e);
+    });
+})
+```
+
+This records an `exception` event on the active span with `exception.type`, `exception.message`, and `exception.stacktrace`, and sets the span status to `ERROR`. Safe to call when no active span exists (no-op).
 
 ### Custom Metrics
 
@@ -194,12 +247,13 @@ Log records are automatically enriched with trace context (`trace_id`, `span_id`
 
 ## How It Works
 
-1. The `StartRequestTrace` middleware creates a root span and `RequestContext` for each request
-2. Your app records custom spans and metrics via the `Monitoring` facade
-3. The `MonitoringLogProcessor` enriches log records with trace context
-4. On `terminate()`, the middleware ends the root span and flushes traces via OTLP/JSON to `/v1/traces`
-5. The `OtlpLogHandler` buffers log records and flushes them to `/v1/logs` on close
-6. Metrics are exported to `/v1/metrics` on flush — all in-memory, no cache driver needed
+1. The `StartRequestTrace` middleware creates a root span, records HTTP metrics, and populates `RequestContext`
+2. Auto-instrumentation listeners create child spans for DB queries, HTTP client calls, cache operations, and queue jobs
+3. Your app records custom spans and metrics via the `Monitoring` facade
+4. The `MonitoringLogProcessor` enriches log records with trace context
+5. The middleware ends the root span, flushes traces via OTLP/JSON to `/v1/traces`, and exports metrics to `/v1/metrics`
+6. The `OtlpLogHandler` buffers log records and flushes them to `/v1/logs` on close
+7. All in-memory, no cache driver or external state needed
 
 All OTLP payloads include resource attributes (`service.name`, `deployment.environment`, `service.instance.id`) for identification in Grafana.
 
@@ -209,10 +263,17 @@ All OTLP payloads include resource attributes (`service.name`, `deployment.envir
 Laravel App
   ├── StartRequestTrace (middleware)
   │     ├── Creates root Span (SERVER kind)
+  │     ├── Records http_requests_total + http_request_duration_ms metrics
   │     ├── Populates RequestContext
-  │     └── Flushes on terminate()
+  │     └── Flushes traces + metrics inline
+  ├── Auto-Instrumentation (event listeners)
+  │     ├── TraceDbQueries       → db.query child spans
+  │     ├── TraceHttpClient      → http.client child spans
+  │     ├── TraceCacheOperations → cache.hit/miss/write/forget child spans
+  │     └── TraceQueueJobs       → queue.job root spans
   ├── Monitoring Facade
   │     ├── span() / startSpan()  → TracerContract → OtlpTracer
+  │     ├── reportException()     → records exception on active span
   │     ├── counter() / gauge() / histogram()  → MetricRegistry
   │     └── flush()  → exports traces + metrics
   ├── Log Channel ("monitoring")
