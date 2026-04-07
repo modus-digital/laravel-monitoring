@@ -2,6 +2,10 @@
 
 All notable changes to `laravel-monitoring` will be documented in this file.
 
+## 1.3.0 - 2026-04-07
+
+**Full Changelog**: https://github.com/modus-digital/laravel-monitoring/compare/1.2.2...1.3.0
+
 ## 1.2.2 - 2026-04-03
 
 **Full Changelog**: https://github.com/modus-digital/laravel-monitoring/compare/1.2.1...1.2.2
