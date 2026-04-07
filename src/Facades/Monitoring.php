@@ -42,6 +42,7 @@ class Monitoring extends Facade
             $span->addEvent('exception', [
                 'exception.type' => get_class($e),
                 'exception.message' => $e->getMessage(),
+                'exception.stacktrace' => $e->getTraceAsString(),
             ]);
             $span->setStatus(SpanStatus::ERROR);
             $span->end();
@@ -54,6 +55,23 @@ class Monitoring extends Facade
     public static function startSpan(string $name, array $attributes = [], SpanKind $kind = SpanKind::INTERNAL): Span
     {
         return app(TracerContract::class)->startSpan($name, $attributes, $kind);
+    }
+
+    public static function reportException(\Throwable $e): void
+    {
+        $tracer = app(TracerContract::class);
+        $span = $tracer->activeSpan();
+
+        if ($span === null) {
+            return;
+        }
+
+        $span->addEvent('exception', [
+            'exception.type' => get_class($e),
+            'exception.message' => $e->getMessage(),
+            'exception.stacktrace' => $e->getTraceAsString(),
+        ]);
+        $span->setStatus(SpanStatus::ERROR);
     }
 
     public static function flush(): void
